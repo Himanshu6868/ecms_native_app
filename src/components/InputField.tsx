@@ -1,11 +1,22 @@
 import React from 'react';
-import { StyleSheet, Text, TextInput, TextInputProps, View } from 'react-native';
+import {
+  StyleProp,
+  StyleSheet,
+  Text,
+  TextInput,
+  TextInputProps,
+  TextStyle,
+  View,
+  ViewStyle,
+} from 'react-native';
 
 type InputFieldProps = TextInputProps & {
   label: string;
   error?: string;
   maxLength?: number;
   currentLength?: number;
+  containerStyle?: StyleProp<ViewStyle>;
+  inputStyle?: StyleProp<TextStyle>;
 };
 
 const InputField = ({
@@ -13,16 +24,24 @@ const InputField = ({
   error,
   maxLength,
   currentLength,
-  style,
+  multiline,
+  containerStyle,
+  inputStyle,
   ...textInputProps
 }: InputFieldProps): React.JSX.Element => {
   return (
-    <View style={styles.wrapper}>
+    <View style={[styles.wrapper, containerStyle]}>
       <Text style={styles.label}>{label}</Text>
       <TextInput
         placeholderTextColor="#6B7280"
-        style={[styles.input, style, !!error && styles.inputError]}
+        style={[
+          styles.input,
+          multiline ? styles.multilineInput : styles.singleLineInput,
+          !!error && styles.inputError,
+          inputStyle,
+        ]}
         maxLength={maxLength}
+        multiline={multiline}
         {...textInputProps}
       />
       <View style={styles.metaRow}>
@@ -39,7 +58,7 @@ const InputField = ({
 
 const styles = StyleSheet.create({
   wrapper: {
-    marginBottom: 20,
+    marginBottom: 18,
   },
   label: {
     color: '#E5E7EB',
@@ -48,14 +67,20 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   input: {
-    minHeight: 120,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#374151',
     backgroundColor: '#111827',
     color: '#F9FAFB',
-    fontSize: 14,
+    fontSize: 15,
     paddingHorizontal: 14,
+  },
+  singleLineInput: {
+    minHeight: 52,
+    paddingVertical: 10,
+  },
+  multilineInput: {
+    minHeight: 120,
     paddingVertical: 12,
     textAlignVertical: 'top',
   },
@@ -64,6 +89,7 @@ const styles = StyleSheet.create({
   },
   metaRow: {
     marginTop: 8,
+    minHeight: 18,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
