@@ -1,25 +1,35 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, ViewStyle } from 'react-native';
+import { Pressable, StyleProp, StyleSheet, Text, ViewStyle } from 'react-native';
 
-type ButtonVariant = 'primary' | 'secondary' | 'danger';
+type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'text';
 
 type ButtonProps = {
   title: string;
   onPress: () => void;
   variant?: ButtonVariant;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
+  disabled?: boolean;
 };
 
-const Button = ({ title, onPress, variant = 'primary', style }: ButtonProps): React.JSX.Element => {
+const Button = ({
+  title,
+  onPress,
+  variant = 'primary',
+  style,
+  disabled = false,
+}: ButtonProps): React.JSX.Element => {
   return (
     <Pressable
       onPress={onPress}
+      disabled={disabled}
       style={({ pressed }) => [
         styles.base,
         variant === 'primary' && styles.primary,
         variant === 'secondary' && styles.secondary,
         variant === 'danger' && styles.danger,
-        pressed && styles.pressed,
+        variant === 'text' && styles.text,
+        pressed && !disabled && styles.pressed,
+        disabled && styles.disabled,
         style,
       ]}
     >
@@ -29,6 +39,8 @@ const Button = ({ title, onPress, variant = 'primary', style }: ButtonProps): Re
           variant === 'primary' && styles.primaryLabel,
           variant === 'secondary' && styles.secondaryLabel,
           variant === 'danger' && styles.dangerLabel,
+          variant === 'text' && styles.textLabel,
+          disabled && styles.disabledLabel,
         ]}
       >
         {title}
@@ -58,8 +70,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#DC2626',
     borderColor: '#EF4444',
   },
+  text: {
+    minHeight: 36,
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+    paddingHorizontal: 0,
+  },
+  disabled: {
+    opacity: 0.5,
+  },
   pressed: {
-    opacity: 0.8,
+    opacity: 0.85,
   },
   label: {
     fontSize: 15,
@@ -73,6 +94,13 @@ const styles = StyleSheet.create({
   },
   dangerLabel: {
     color: '#FFFFFF',
+  },
+  textLabel: {
+    color: '#93C5FD',
+    fontWeight: '600',
+  },
+  disabledLabel: {
+    color: '#CBD5E1',
   },
 });
 
