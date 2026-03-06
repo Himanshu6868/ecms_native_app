@@ -15,7 +15,7 @@ const Stack = createNativeStackNavigator<AuthStackParamList>();
 
 const AuthNavigator = (): React.JSX.Element => {
   return (
-    <Stack.Navigator initialRouteName="FlowSelection" screenOptions={{ headerShown: false }}>
+    <Stack.Navigator initialRouteName="CustomerLogin" screenOptions={{ headerShown: false }}>
       <Stack.Screen name="FlowSelection" component={FlowSelectionScreen} />
       <Stack.Screen name="CustomerLogin" component={CustomerLoginScreen} />
       <Stack.Screen name="InternalLogin" component={InternalLoginScreen} />
