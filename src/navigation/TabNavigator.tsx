@@ -1,22 +1,20 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
 import DashboardScreen from '../screens/DashboardScreen';
+import ProfileScreen from '../screens/ProfileScreen';
 import TicketCreationScreen from '../screens/TicketCreationScreen';
 import MyTicketsScreen from '../screens/MyTicketsScreen';
 
-const Tab = createBottomTabNavigator();
-
-const PlaceholderScreen = ({ label }: { label: string }): React.JSX.Element => {
-  return (
-    <View style={styles.placeholderContainer}>
-      <Text style={styles.placeholderTitle}>{label}</Text>
-      <Text style={styles.placeholderCaption}>Static UI placeholder</Text>
-    </View>
-  );
+type AppTabParamList = {
+  Dashboard: undefined;
+  'Create Ticket': undefined;
+  'My Tickets': undefined;
+  Profile: undefined;
 };
+
+const Tab = createBottomTabNavigator<AppTabParamList>();
 
 const TabNavigator = (): React.JSX.Element => {
   return (
@@ -24,13 +22,25 @@ const TabNavigator = (): React.JSX.Element => {
       initialRouteName="Dashboard"
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarStyle: styles.tabBar,
+        tabBarStyle: {
+          backgroundColor: '#0B1220',
+          borderTopColor: '#1F2937',
+          borderTopWidth: 1,
+          height: 68,
+          paddingBottom: 8,
+          paddingTop: 8,
+        },
         tabBarActiveTintColor: '#60A5FA',
         tabBarInactiveTintColor: '#6B7280',
-        tabBarLabelStyle: styles.tabLabel,
-        sceneStyle: styles.scene,
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '600',
+        },
+        sceneStyle: {
+          backgroundColor: '#030712',
+        },
         tabBarIcon: ({ color, size }) => {
-          const iconMap: Record<string, keyof typeof Ionicons.glyphMap> = {
+          const iconMap: Record<keyof AppTabParamList, keyof typeof Ionicons.glyphMap> = {
             Dashboard: 'grid-outline',
             'Create Ticket': 'add-circle-outline',
             'My Tickets': 'list-outline',
@@ -44,44 +54,9 @@ const TabNavigator = (): React.JSX.Element => {
       <Tab.Screen name="Dashboard" component={DashboardScreen} />
       <Tab.Screen name="Create Ticket" component={TicketCreationScreen} />
       <Tab.Screen name="My Tickets" component={MyTicketsScreen} />
-      <Tab.Screen name="Profile">{() => <PlaceholderScreen label="Profile" />}</Tab.Screen>
+      <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
 };
-
-const styles = StyleSheet.create({
-  scene: {
-    backgroundColor: '#030712',
-  },
-  tabBar: {
-    backgroundColor: '#0B1220',
-    borderTopColor: '#1F2937',
-    borderTopWidth: 1,
-    height: 68,
-    paddingBottom: 8,
-    paddingTop: 8,
-  },
-  tabLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  placeholderContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#030712',
-    padding: 20,
-  },
-  placeholderTitle: {
-    color: '#F9FAFB',
-    fontSize: 24,
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-  placeholderCaption: {
-    color: '#9CA3AF',
-    fontSize: 14,
-  },
-});
 
 export default TabNavigator;
