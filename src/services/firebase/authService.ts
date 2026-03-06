@@ -13,9 +13,6 @@ import { auth, firestore } from './firebase';
 
 const EMAIL_STORAGE_KEY = 'auth_email_for_signin';
 
-const ACTION_CODE_URL =
-  process.env.EXPO_PUBLIC_FIREBASE_EMAIL_LINK_URL ?? Linking.createURL('auth-complete');
-
 export type AuthUserProfile = {
   user: string;
   email: string;
@@ -43,13 +40,15 @@ const mapAuthErrorMessage = (error: unknown): string => {
 };
 
 export const sendLoginLink = async (email: string): Promise<void> => {
+  const actionCodeSettings = {
+    url: 'ecmsnativeapp://auth-complete',
+    handleCodeInApp: true,
+  };
+
   try {
     console.log('[AUTH] Preparing actionCodeSettings');
-    console.log('[AUTH] actionCodeSettings.url:', ACTION_CODE_URL);
-    await sendSignInLinkToEmail(auth, email, {
-      url: ACTION_CODE_URL,
-      handleCodeInApp: true,
-    });
+    console.log('[AUTH] actionCodeSettings.url:', actionCodeSettings.url);
+    await sendSignInLinkToEmail(auth, email, actionCodeSettings);
     console.log('[AUTH] Login link sent successfully');
     console.log('[AUTH] Storing email for sign-in:', email);
 
