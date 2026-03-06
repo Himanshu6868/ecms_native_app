@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-type BadgeVariant = 'neutral' | 'success' | 'warning' | 'danger' | 'info' | 'active';
+type BadgeVariant = 'neutral' | 'success' | 'warning' | 'danger' | 'info' | 'active' | 'assigned';
 
 type BadgeProps = {
   label: string;
@@ -15,6 +15,7 @@ const variantStyles: Record<BadgeVariant, { backgroundColor: string; color: stri
   danger: { backgroundColor: '#3B0A13', color: '#FDA4AF', borderColor: '#7F1D1D' },
   info: { backgroundColor: '#0A2E45', color: '#7DD3FC', borderColor: '#164E63' },
   active: { backgroundColor: '#1D4ED8', color: '#DBEAFE', borderColor: '#2563EB' },
+  assigned: { backgroundColor: '#2E1065', color: '#DDD6FE', borderColor: '#5B21B6' },
 };
 
 const Badge = ({ label, variant = 'neutral' }: BadgeProps): React.JSX.Element => {

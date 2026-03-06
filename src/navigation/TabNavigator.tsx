@@ -5,6 +5,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
 import DashboardScreen from '../screens/DashboardScreen';
 import TicketCreationScreen from '../screens/TicketCreationScreen';
+import MyTicketsScreen from '../screens/MyTicketsScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -42,7 +43,7 @@ const TabNavigator = (): React.JSX.Element => {
     >
       <Tab.Screen name="Dashboard" component={DashboardScreen} />
       <Tab.Screen name="Create Ticket" component={TicketCreationScreen} />
-      <Tab.Screen name="My Tickets">{() => <PlaceholderScreen label="My Tickets" />}</Tab.Screen>
+      <Tab.Screen name="My Tickets" component={MyTicketsScreen} />
       <Tab.Screen name="Profile">{() => <PlaceholderScreen label="Profile" />}</Tab.Screen>
     </Tab.Navigator>
   );
