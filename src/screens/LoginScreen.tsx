@@ -4,12 +4,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-import type { RootStackParamList } from '../../App';
+import type { AuthStackParamList } from '../navigation/AuthStackNavigator';
 import Button from '../components/Button';
 import InputField from '../components/InputField';
 import { getEmailError, getPasswordError } from '../utils/validators';
 
-type LoginNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Login'>;
+type LoginNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'FlowSelection'>;
 
 const LoginScreen = (): React.JSX.Element => {
   const navigation = useNavigation<LoginNavigationProp>();
@@ -34,10 +34,7 @@ const LoginScreen = (): React.JSX.Element => {
       return;
     }
 
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'Dashboard' }],
-    });
+    navigation.replace('Dashboard');
   };
 
   return (
@@ -83,6 +80,13 @@ const LoginScreen = (): React.JSX.Element => {
           />
 
           <Button title="Login" onPress={handleLogin} disabled={!isFormValid} style={styles.loginButton} />
+
+          <Button
+            title="Skip Login (Dev Mode)"
+            onPress={() => navigation.replace('Dashboard')}
+            variant="secondary"
+            style={styles.skipLoginButton}
+          />
 
           <Button title="Forgot Password?" onPress={() => {}} variant="text" style={styles.forgotButton} />
         </View>
@@ -141,6 +145,11 @@ const styles = StyleSheet.create({
   },
   loginButton: {
     marginTop: 4,
+    width: '100%',
+    borderRadius: 12,
+  },
+  skipLoginButton: {
+    marginTop: 14,
     width: '100%',
     borderRadius: 12,
   },

@@ -27,11 +27,11 @@ const InternalLoginScreen = ({ navigation }: Props): React.JSX.Element => {
       }
 
       console.log('[AUTH] Login flow complete');
-      console.log('[AUTH] Redirecting to AppTabs');
+      console.log('[AUTH] Redirecting to Dashboard');
       setUser(profile);
       navigation.reset({
         index: 0,
-        routes: [{ name: 'AppTabs' }],
+        routes: [{ name: 'Dashboard' }],
       });
     } catch (error) {
       console.error('[AUTH] Error:', error);
