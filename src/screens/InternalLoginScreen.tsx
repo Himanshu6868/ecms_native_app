@@ -26,12 +26,15 @@ const InternalLoginScreen = ({ navigation }: Props): React.JSX.Element => {
         return;
       }
 
+      console.log('[AUTH] Login flow complete');
+      console.log('[AUTH] Redirecting to AppTabs');
       setUser(profile);
       navigation.reset({
         index: 0,
         routes: [{ name: 'AppTabs' }],
       });
     } catch (error) {
+      console.error('[AUTH] Error:', error);
       setLoading(false);
       const message = error instanceof Error ? error.message : 'Unable to login. Please try again.';
       Alert.alert('Login failed', message);
@@ -51,6 +54,8 @@ const InternalLoginScreen = ({ navigation }: Props): React.JSX.Element => {
   }, []);
 
   const handleSendLink = async (): Promise<void> => {
+    console.log('[AUTH] Send Login Link button pressed');
+    console.log('[AUTH] Email entered:', email);
     const normalizedEmail = email.trim().toLowerCase();
 
     if (!normalizedEmail) {
@@ -63,11 +68,14 @@ const InternalLoginScreen = ({ navigation }: Props): React.JSX.Element => {
       return;
     }
 
+    console.log('[AUTH] Email validation passed');
+
     try {
       setBusy(true);
       await sendLoginLink(normalizedEmail);
       Alert.alert('Login link sent', 'Check your inbox and open the link on this device.');
     } catch (error) {
+      console.error('[AUTH] Error:', error);
       const message = error instanceof Error ? error.message : 'Unable to send login link.';
       Alert.alert('Login link error', message);
     } finally {
