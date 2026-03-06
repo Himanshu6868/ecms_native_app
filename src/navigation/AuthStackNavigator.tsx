@@ -6,6 +6,7 @@ import CustomerLoginScreen from '../screens/CustomerLoginScreen';
 import FlowSelectionScreen from '../screens/FlowSelectionScreen';
 import InternalLoginScreen from '../screens/InternalLoginScreen';
 import TabNavigator from './TabNavigator';
+import { useAuthStore } from '../store/useAuthStore';
 
 export type AuthStackParamList = {
   FlowSelection: undefined;
@@ -29,19 +30,25 @@ const appTheme = {
 };
 
 const AuthStackNavigator = (): React.JSX.Element => {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
   return (
     <NavigationContainer theme={appTheme}>
       <Stack.Navigator
-        initialRouteName="FlowSelection"
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: '#030712' },
         }}
       >
-        <Stack.Screen name="FlowSelection" component={FlowSelectionScreen} />
-        <Stack.Screen name="CustomerLogin" component={CustomerLoginScreen} />
-        <Stack.Screen name="InternalLogin" component={InternalLoginScreen} />
-        <Stack.Screen name="AppTabs" component={TabNavigator} />
+        {isAuthenticated ? (
+          <Stack.Screen name="AppTabs" component={TabNavigator} />
+        ) : (
+          <>
+            <Stack.Screen name="FlowSelection" component={FlowSelectionScreen} />
+            <Stack.Screen name="CustomerLogin" component={CustomerLoginScreen} />
+            <Stack.Screen name="InternalLogin" component={InternalLoginScreen} />
+          </>
+        )}
       </Stack.Navigator>
     </NavigationContainer>
   );
