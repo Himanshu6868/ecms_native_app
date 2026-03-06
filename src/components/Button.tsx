@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, ViewStyle } from 'react-native';
 
-type ButtonVariant = 'primary' | 'secondary';
+type ButtonVariant = 'primary' | 'secondary' | 'danger';
 
 type ButtonProps = {
   title: string;
@@ -16,12 +16,23 @@ const Button = ({ title, onPress, variant = 'primary', style }: ButtonProps): Re
       onPress={onPress}
       style={({ pressed }) => [
         styles.base,
-        variant === 'primary' ? styles.primary : styles.secondary,
+        variant === 'primary' && styles.primary,
+        variant === 'secondary' && styles.secondary,
+        variant === 'danger' && styles.danger,
         pressed && styles.pressed,
         style,
       ]}
     >
-      <Text style={[styles.label, variant === 'primary' ? styles.primaryLabel : styles.secondaryLabel]}>{title}</Text>
+      <Text
+        style={[
+          styles.label,
+          variant === 'primary' && styles.primaryLabel,
+          variant === 'secondary' && styles.secondaryLabel,
+          variant === 'danger' && styles.dangerLabel,
+        ]}
+      >
+        {title}
+      </Text>
     </Pressable>
   );
 };
@@ -43,18 +54,25 @@ const styles = StyleSheet.create({
     backgroundColor: '#111827',
     borderColor: '#374151',
   },
+  danger: {
+    backgroundColor: '#DC2626',
+    borderColor: '#EF4444',
+  },
   pressed: {
     opacity: 0.8,
   },
   label: {
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   primaryLabel: {
     color: '#FFFFFF',
   },
   secondaryLabel: {
     color: '#E5E7EB',
+  },
+  dangerLabel: {
+    color: '#FFFFFF',
   },
 });
 
