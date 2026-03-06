@@ -58,7 +58,7 @@ const CustomerLoginScreen = ({ navigation }: Props): React.JSX.Element => {
             onPress={() =>
               navigation.reset({
                 index: 0,
-                routes: [{ name: 'Dashboard' }],
+                routes: [{ name: 'AppTabs' }],
               })
             }
           />
