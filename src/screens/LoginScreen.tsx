@@ -9,7 +9,7 @@ import Button from '../components/Button';
 import InputField from '../components/InputField';
 import { getEmailError, getPasswordError } from '../utils/validators';
 
-type LoginNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'FlowSelection'>;
+type LoginNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Login'>;
 
 const LoginScreen = (): React.JSX.Element => {
   const navigation = useNavigation<LoginNavigationProp>();
@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   skipLoginButton: {
-    marginTop: 14,
+    marginTop: 16,
     width: '100%',
     borderRadius: 12,
   },

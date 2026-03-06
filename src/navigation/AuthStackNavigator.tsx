@@ -5,9 +5,11 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import CustomerLoginScreen from '../screens/CustomerLoginScreen';
 import FlowSelectionScreen from '../screens/FlowSelectionScreen';
 import InternalLoginScreen from '../screens/InternalLoginScreen';
+import LoginScreen from '../screens/LoginScreen';
 import TabNavigator from './TabNavigator';
 
 export type AuthStackParamList = {
+  Login: undefined;
   FlowSelection: undefined;
   CustomerLogin: undefined;
   InternalLogin: undefined;
@@ -32,12 +34,13 @@ const AuthStackNavigator = (): React.JSX.Element => {
   return (
     <NavigationContainer theme={appTheme}>
       <Stack.Navigator
-        initialRouteName="FlowSelection"
+        initialRouteName="Login"
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: '#030712' },
         }}
       >
+        <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="FlowSelection" component={FlowSelectionScreen} />
         <Stack.Screen name="CustomerLogin" component={CustomerLoginScreen} />
         <Stack.Screen name="InternalLogin" component={InternalLoginScreen} />
