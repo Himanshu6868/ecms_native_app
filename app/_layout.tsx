@@ -4,14 +4,14 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 
-import RootNavigator from '../src/navigation/RootNavigator';
+import AppNavigator from '../src/navigation/AppNavigator';
 
 export default function RootLayout(): React.JSX.Element {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <RootNavigator />
-        <StatusBar style="auto" />
+        <AppNavigator />
+        <StatusBar style="light" />
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
