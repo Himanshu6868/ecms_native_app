@@ -1,16 +1,74 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import * as Linking from 'expo-linking';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AppButton from '../components/AppButton';
 import AppInput from '../components/AppInput';
+import { completeSignInWithEmailLink, sendLoginLink } from '../services/firebase/authService';
+import { useAuthStore } from '../store/useAuthStore';
 import { AuthStackParamList } from '../navigation/AuthStackNavigator';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'CustomerLogin'>;
 
 const CustomerLoginScreen = ({ navigation }: Props): React.JSX.Element => {
   const [email, setEmail] = useState('');
-  const [otp, setOtp] = useState('');
+  const [busy, setBusy] = useState(false);
+  const { setUser, setLoading } = useAuthStore();
+
+  const handleCompleteLogin = async (url?: string): Promise<void> => {
+    try {
+      setLoading(true);
+      const profile = await completeSignInWithEmailLink(url);
+
+      if (!profile) {
+        setLoading(false);
+        return;
+      }
+
+      setUser(profile);
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'AppTabs' }],
+      });
+    } catch (error) {
+      setLoading(false);
+      const message = error instanceof Error ? error.message : 'Unable to login. Please try again.';
+      Alert.alert('Login failed', message);
+    }
+  };
+
+  useEffect(() => {
+    void handleCompleteLogin();
+
+    const subscription = Linking.addEventListener('url', (event) => {
+      void handleCompleteLogin(event.url);
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  const handleSendLink = async (): Promise<void> => {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!normalizedEmail) {
+      Alert.alert('Missing email', 'Please enter your email address.');
+      return;
+    }
+
+    try {
+      setBusy(true);
+      await sendLoginLink(normalizedEmail);
+      Alert.alert('Login link sent', 'Check your inbox and open the link on this device.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to send login link.';
+      Alert.alert('Login link error', message);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -21,7 +79,7 @@ const CustomerLoginScreen = ({ navigation }: Props): React.JSX.Element => {
       <View style={styles.infoCard}>
         <Text style={styles.badge}>NORMAL USER FLOW</Text>
         <Text style={styles.infoTitle}>Customer and agent access</Text>
-        <Text style={styles.bullet}>• OTP login without passwords</Text>
+        <Text style={styles.bullet}>• Email link login without passwords</Text>
         <Text style={styles.bullet}>• Faster onboarding</Text>
         <Text style={styles.bullet}>• Clear incident visibility</Text>
       </View>
@@ -29,7 +87,7 @@ const CustomerLoginScreen = ({ navigation }: Props): React.JSX.Element => {
       <View style={styles.formCard}>
         <Text style={styles.badge}>CUSTOMER/AGENT ACCESS</Text>
         <Text style={styles.formTitle}>User Portal Login</Text>
-        <Text style={styles.formSubtitle}>Use your registered email to request OTP access.</Text>
+        <Text style={styles.formSubtitle}>Use your registered email to receive a secure login link.</Text>
 
         <AppInput
           value={email}
@@ -39,28 +97,14 @@ const CustomerLoginScreen = ({ navigation }: Props): React.JSX.Element => {
           placeholder="you@example.com"
         />
 
-        <AppInput
-          value={otp}
-          onChangeText={setOtp}
-          keyboardType="number-pad"
-          maxLength={6}
-          placeholder="6-digit OTP"
-        />
-
         <View style={styles.btnGroup}>
           <AppButton
-            title="Generate OTP"
-            variant="secondary"
-            onPress={() => Alert.alert('Demo only', 'OTP generation is UI-only in this build.')}
-          />
-          <AppButton
-            title="Sign In to User Portal"
-            onPress={() =>
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'AppTabs' }],
-              })
-            }
+            title={busy ? 'Sending...' : 'Send Login Link'}
+            onPress={() => {
+              if (!busy) {
+                void handleSendLink();
+              }
+            }}
           />
         </View>
       </View>

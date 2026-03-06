@@ -13,7 +13,7 @@ const FlowSelectionScreen = ({ navigation }: Props): React.JSX.Element => {
       <Text style={styles.topBadge}>ECMS AUTH</Text>
       <Text style={styles.title}>Secure access for every workflow</Text>
       <Text style={styles.subtitle}>
-        Enterprise OTP authentication with separate flows for external users and internal teams.
+        Enterprise passwordless email-link authentication with separate flows for external users and internal teams.
       </Text>
 
       <View style={styles.card}>

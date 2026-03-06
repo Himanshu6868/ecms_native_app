@@ -1,39 +1,41 @@
-import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import React from 'react';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-import type { RootStackParamList } from '../../App';
 import ActionItem from '../components/ActionItem';
 import Button from '../components/Button';
 import InfoRow from '../components/InfoRow';
+import { AuthStackParamList } from '../navigation/AuthStackNavigator';
+import { logout as firebaseLogout } from '../services/firebase/authService';
+import { useAuthStore } from '../store/useAuthStore';
 
-type ProfileNavigationProp = NativeStackNavigationProp<RootStackParamList>;
-
-type UserProfile = {
-  name: string;
-  email: string;
-  role: string;
-  department: string;
-  employeeId: string;
-};
+type ProfileNavigationProp = NativeStackNavigationProp<AuthStackParamList>;
 
 const ProfileScreen = (): React.JSX.Element => {
   const navigation = useNavigation<ProfileNavigationProp>();
-  const [user] = useState<UserProfile>({
-    name: 'Rahul Sharma',
-    email: 'rahul.sharma@company.com',
-    role: 'ADMIN',
-    department: 'Operations',
-    employeeId: 'EMP-1024',
-  });
+  const { user, name, email, role, logout } = useAuthStore();
 
-  const handleLogout = () => {
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'Login' }],
-    });
+  const handleLogout = async (): Promise<void> => {
+    try {
+      await firebaseLogout();
+      logout();
+
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'FlowSelection' }],
+      });
+    } catch {
+      Alert.alert('Logout failed', 'Unable to logout right now. Please try again.');
+    }
   };
+
+  const initials = (name ?? 'User')
+    .split(' ')
+    .map((part) => part.charAt(0))
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -44,19 +46,19 @@ const ProfileScreen = (): React.JSX.Element => {
 
       <View style={styles.card}>
         <View style={styles.avatar}>
-          <Text style={styles.avatarText}>RS</Text>
+          <Text style={styles.avatarText}>{initials}</Text>
         </View>
 
-        <Text style={styles.name}>{user.name}</Text>
-        <Text style={styles.email}>{user.email}</Text>
+        <Text style={styles.name}>{name ?? 'User'}</Text>
+        <Text style={styles.email}>{email ?? '-'}</Text>
 
         <View style={styles.roleBadge}>
-          <Text style={styles.roleText}>{user.role}</Text>
+          <Text style={styles.roleText}>{(role ?? 'user').toUpperCase()}</Text>
         </View>
 
         <View style={styles.infoSection}>
-          <InfoRow label="Department" value={user.department} />
-          <InfoRow label="Employee ID" value={user.employeeId} />
+          <InfoRow label="Department" value="Support" />
+          <InfoRow label="User ID" value={user ?? '-'} />
         </View>
       </View>
 
@@ -70,7 +72,7 @@ const ProfileScreen = (): React.JSX.Element => {
       </View>
 
       <View style={styles.logoutSection}>
-        <Button title="Logout" variant="danger" onPress={handleLogout} style={styles.logoutButton} />
+        <Button title="Logout" variant="danger" onPress={() => void handleLogout()} style={styles.logoutButton} />
       </View>
     </ScrollView>
   );
