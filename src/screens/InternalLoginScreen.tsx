@@ -53,7 +53,15 @@ const InternalLoginScreen = ({ navigation }: Props): React.JSX.Element => {
             variant="secondary"
             onPress={() => Alert.alert('Demo only', 'OTP generation is UI-only in this build.')}
           />
-          <AppButton title="Sign In to Internal Portal" onPress={() => navigation.navigate('Dashboard')} />
+          <AppButton
+            title="Sign In to Internal Portal"
+            onPress={() =>
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Dashboard' }],
+              })
+            }
+          />
         </View>
       </View>
     </ScrollView>
