@@ -34,14 +34,27 @@ const mapAuthErrorMessage = (error: unknown): string => {
       return 'This account is disabled. Contact admin.';
     case 'auth/network-request-failed':
       return 'Network error. Please check your connection and try again.';
+    case 'auth/unauthorized-continue-uri':
+      return 'Login link setup is incomplete. Please contact support.';
     default:
       return 'Unable to complete authentication. Please try again.';
   }
 };
 
+const buildEmailLinkUrl = (): string => {
+  const authDomain = process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN;
+
+  if (authDomain) {
+    const normalizedAuthDomain = authDomain.replace(/^https?:\/\//, '');
+    return `https://${normalizedAuthDomain}/auth-complete`;
+  }
+
+  return 'https://localhost/auth-complete';
+};
+
 export const sendLoginLink = async (email: string): Promise<void> => {
   const actionCodeSettings = {
-    url: 'ecmsnativeapp://auth-complete',
+    url: buildEmailLinkUrl(),
     handleCodeInApp: true,
   };
 
