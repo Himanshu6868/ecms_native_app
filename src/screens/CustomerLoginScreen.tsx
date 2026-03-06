@@ -1,75 +1,127 @@
 import React, { useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AppButton from '../components/AppButton';
 import AppInput from '../components/AppInput';
-import { RootStackParamList } from '../navigation/AppNavigator';
+import { AuthStackParamList } from '../navigation/AuthStackNavigator';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'CustomerLogin'>;
-
-const isBasicEmail = (value: string): boolean => /.+@.+\..+/.test(value);
+type Props = NativeStackScreenProps<AuthStackParamList, 'CustomerLogin'>;
 
 const CustomerLoginScreen = ({ navigation }: Props): React.JSX.Element => {
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
 
-  const handleSignIn = (): void => {
-    if (!email.trim()) {
-      Alert.alert('Enter email', 'Please enter your email to continue.');
-      return;
-    }
-
-    if (!isBasicEmail(email.trim())) {
-      Alert.alert('Invalid email', 'Please enter a valid email format.');
-      return;
-    }
-
-    navigation.navigate('Dashboard', { email: email.trim() });
-  };
-
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>User Portal Login</Text>
-      <AppInput
-        value={email}
-        onChangeText={setEmail}
-        placeholder="Email"
-        autoCapitalize="none"
-        keyboardType="email-address"
-      />
-      <AppInput
-        value={otp}
-        onChangeText={setOtp}
-        placeholder="OTP"
-        keyboardType="number-pad"
-      />
+    <ScrollView contentContainerStyle={styles.container}>
+      <TouchableOpacity style={styles.backWrap} onPress={() => navigation.navigate('FlowSelection')}>
+        <Text style={styles.backText}>← Back to flow selection</Text>
+      </TouchableOpacity>
 
-      <View style={styles.buttonsWrap}>
-        <AppButton title="Generate OTP" onPress={() => Alert.alert('OTP sent')} />
-        <AppButton title="Sign In" onPress={handleSignIn} />
-        <AppButton title="Back" variant="secondary" onPress={() => navigation.navigate('FlowSelection')} />
+      <View style={styles.infoCard}>
+        <Text style={styles.badge}>NORMAL USER FLOW</Text>
+        <Text style={styles.infoTitle}>Customer and agent access</Text>
+        <Text style={styles.bullet}>• OTP login without passwords</Text>
+        <Text style={styles.bullet}>• Faster onboarding</Text>
+        <Text style={styles.bullet}>• Clear incident visibility</Text>
       </View>
-    </View>
+
+      <View style={styles.formCard}>
+        <Text style={styles.badge}>CUSTOMER/AGENT ACCESS</Text>
+        <Text style={styles.formTitle}>User Portal Login</Text>
+        <Text style={styles.formSubtitle}>Use your registered email to request OTP access.</Text>
+
+        <AppInput
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+          keyboardType="email-address"
+          placeholder="you@example.com"
+        />
+
+        <AppInput
+          value={otp}
+          onChangeText={setOtp}
+          keyboardType="number-pad"
+          maxLength={6}
+          placeholder="6-digit OTP"
+        />
+
+        <View style={styles.btnGroup}>
+          <AppButton
+            title="Generate OTP"
+            variant="secondary"
+            onPress={() => Alert.alert('Demo only', 'OTP generation is UI-only in this build.')}
+          />
+          <AppButton title="Sign In to User Portal" onPress={() => navigation.navigate('Dashboard')} />
+        </View>
+      </View>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#0B1220',
+    flexGrow: 1,
     paddingHorizontal: 20,
-    justifyContent: 'center',
+    paddingTop: 54,
+    paddingBottom: 24,
+    backgroundColor: '#030712',
+    gap: 14,
   },
-  title: {
-    color: '#F9FAFB',
-    fontSize: 30,
+  backWrap: {
+    alignSelf: 'flex-start',
+  },
+  backText: {
+    color: '#93C5FD',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  infoCard: {
+    backgroundColor: '#0B1220',
+    borderWidth: 1,
+    borderColor: '#1F2937',
+    borderRadius: 18,
+    padding: 18,
+    gap: 10,
+  },
+  badge: {
+    color: '#60A5FA',
+    fontSize: 11,
+    letterSpacing: 0.8,
     fontWeight: '700',
-    marginBottom: 24,
-    textAlign: 'center',
   },
-  buttonsWrap: {
+  infoTitle: {
+    color: '#F9FAFB',
+    fontSize: 24,
+    fontWeight: '700',
+  },
+  bullet: {
+    color: '#CBD5E1',
+    fontSize: 15,
+    lineHeight: 21,
+  },
+  formCard: {
+    backgroundColor: '#0B1220',
+    borderWidth: 1,
+    borderColor: '#1F2937',
+    borderRadius: 18,
+    padding: 18,
+  },
+  formTitle: {
+    color: '#F9FAFB',
+    fontSize: 24,
+    fontWeight: '700',
+    marginTop: 6,
+  },
+  formSubtitle: {
+    color: '#9CA3AF',
+    fontSize: 14,
     marginTop: 8,
+    marginBottom: 16,
+  },
+  btnGroup: {
+    marginTop: 4,
     gap: 10,
   },
 });
