@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
 import DashboardScreen from '../screens/DashboardScreen';
+import TicketCreationScreen from '../screens/TicketCreationScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -40,7 +41,7 @@ const TabNavigator = (): React.JSX.Element => {
       })}
     >
       <Tab.Screen name="Dashboard" component={DashboardScreen} />
-      <Tab.Screen name="Create Ticket">{() => <PlaceholderScreen label="Create Ticket" />}</Tab.Screen>
+      <Tab.Screen name="Create Ticket" component={TicketCreationScreen} />
       <Tab.Screen name="My Tickets">{() => <PlaceholderScreen label="My Tickets" />}</Tab.Screen>
       <Tab.Screen name="Profile">{() => <PlaceholderScreen label="Profile" />}</Tab.Screen>
     </Tab.Navigator>
