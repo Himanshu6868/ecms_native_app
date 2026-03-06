@@ -17,15 +17,18 @@ const ProfileScreen = (): React.JSX.Element => {
   const { user, name, email, role, logout } = useAuthStore();
 
   const handleLogout = async (): Promise<void> => {
+    console.log('[AUTH] Logout button pressed');
     try {
       await firebaseLogout();
       logout();
 
+      console.log('[AUTH] Redirecting to FlowSelection');
       navigation.reset({
         index: 0,
         routes: [{ name: 'FlowSelection' }],
       });
-    } catch {
+    } catch (error) {
+      console.error('[AUTH] Error:', error);
       Alert.alert('Logout failed', 'Unable to logout right now. Please try again.');
     }
   };

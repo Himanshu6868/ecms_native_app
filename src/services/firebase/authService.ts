@@ -44,42 +44,67 @@ const mapAuthErrorMessage = (error: unknown): string => {
 
 export const sendLoginLink = async (email: string): Promise<void> => {
   try {
+    console.log('[AUTH] Preparing actionCodeSettings');
+    console.log('[AUTH] actionCodeSettings.url:', ACTION_CODE_URL);
     await sendSignInLinkToEmail(auth, email, {
       url: ACTION_CODE_URL,
       handleCodeInApp: true,
     });
+    console.log('[AUTH] Login link sent successfully');
+    console.log('[AUTH] Storing email for sign-in:', email);
 
     await SecureStore.setItemAsync(EMAIL_STORAGE_KEY, email);
   } catch (error) {
+    console.error('[AUTH] Error:', error);
     throw new Error(mapAuthErrorMessage(error));
   }
 };
 
 export const completeSignInWithEmailLink = async (url?: string): Promise<AuthUserProfile | null> => {
+  if (!url) {
+    console.log('[AUTH] App launched');
+  }
   const link = url ?? (await Linking.getInitialURL());
+  console.log('[AUTH] Initial URL:', link);
+  console.log('[AUTH] Checking if URL is sign-in link');
+  const isSignInLink = !!link && isSignInWithEmailLink(auth, link);
+  console.log('[AUTH] isSignInWithEmailLink:', isSignInLink);
 
-  if (!link || !isSignInWithEmailLink(auth, link)) {
+  if (!isSignInLink) {
     return null;
   }
 
+  console.log('[AUTH] Retrieving stored email from SecureStore');
   const storedEmail = await SecureStore.getItemAsync(EMAIL_STORAGE_KEY);
 
   if (!storedEmail) {
+    console.warn('[AUTH] No stored email found');
     throw new Error('Email confirmation missing. Please request a new login link.');
   }
 
+  console.log('[AUTH] Stored email:', storedEmail);
+
   try {
     const credential = await signInWithEmailLink(auth, storedEmail, link);
+    console.log('[AUTH] Firebase sign-in successful');
+    console.log('[AUTH] User UID:', credential.user.uid);
+    console.log('[AUTH] User email:', credential.user.email);
     await SecureStore.deleteItemAsync(EMAIL_STORAGE_KEY);
 
+    console.log('[AUTH] Fetching user profile from Firestore');
+    console.log('[AUTH] Path:', `users/${credential.user.uid}`);
     const docRef = doc(firestore, 'users', credential.user.uid);
     const snap = await getDoc(docRef);
 
     if (!snap.exists()) {
+      console.error('[AUTH] Firestore user doc NOT found');
       throw new Error('User not registered. Contact admin.');
     }
 
     const data = snap.data();
+    console.log('[AUTH] Firestore user doc found');
+    console.log('[AUTH] Role:', data.role);
+    console.log('[AUTH] Name:', data.name);
 
     return {
       user: credential.user.uid,
@@ -88,6 +113,7 @@ export const completeSignInWithEmailLink = async (url?: string): Promise<AuthUse
       role: data.role,
     };
   } catch (error) {
+    console.error('[AUTH] Error:', error);
     if (error instanceof Error && error.message === 'User not registered. Contact admin.') {
       throw error;
     }
@@ -97,5 +123,11 @@ export const completeSignInWithEmailLink = async (url?: string): Promise<AuthUse
 };
 
 export const logout = async (): Promise<void> => {
-  await signOut(auth);
+  try {
+    await signOut(auth);
+    console.log('[AUTH] Firebase signOut successful');
+  } catch (error) {
+    console.error('[AUTH] Error:', error);
+    throw error;
+  }
 };
