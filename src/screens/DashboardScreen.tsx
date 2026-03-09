@@ -1,42 +1,94 @@
-import React from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { collection, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
 
 import ActionButton from '../components/ActionButton';
 import Badge from '../components/Badge';
 import StatCard from '../components/StatCard';
+import { firestore } from '../services/firebase/firebase';
+
+type TicketStatus = 'OPEN' | 'CLOSED' | 'ASSIGNED';
+type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
 type Ticket = {
   id: string;
-  status: 'CLOSED' | 'ASSIGNED';
-  priority: 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  status: TicketStatus;
+  priority: TicketPriority;
   assignedTo: string;
 };
 
-const tickets: Ticket[] = [
-  {
-    id: '#f0472021',
-    status: 'CLOSED',
-    priority: 'MEDIUM',
-    assignedTo: 'support.member2.demo@gmail.com',
-  },
-  {
-    id: '#4f13f34b',
-    status: 'ASSIGNED',
-    priority: 'HIGH',
-    assignedTo: 'super.admin1.demo@gmail.com',
-  },
-  {
-    id: '#bc054a70',
-    status: 'CLOSED',
-    priority: 'CRITICAL',
-    assignedTo: 'support.member1.demo@gmail.com',
-  },
-];
+const TICKETS_COLLECTION = 'tickets';
+
+const normalizeStatus = (status: unknown): TicketStatus => {
+  if (status === 'CLOSED' || status === 'ASSIGNED' || status === 'OPEN') {
+    return status;
+  }
+
+  return 'OPEN';
+};
+
+const normalizePriority = (priority: unknown): TicketPriority => {
+  if (priority === 'LOW' || priority === 'MEDIUM' || priority === 'HIGH' || priority === 'CRITICAL') {
+    return priority;
+  }
+
+  return 'LOW';
+};
 
 const DashboardScreen = (): React.JSX.Element => {
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const ticketsQuery = query(collection(firestore, TICKETS_COLLECTION), orderBy('createdAt', 'desc'), limit(20));
+
+    const unsubscribe = onSnapshot(
+      ticketsQuery,
+      (snapshot) => {
+        const nextTickets: Ticket[] = snapshot.docs.map((docSnapshot) => {
+          const data = docSnapshot.data();
+
+          return {
+            id: `#${docSnapshot.id}`,
+            status: normalizeStatus(data.status),
+            priority: normalizePriority(data.priority),
+            assignedTo: typeof data.assignedTo === 'string' && data.assignedTo.trim() ? data.assignedTo : 'Unassigned',
+          };
+        });
+
+        setTickets(nextTickets);
+        setIsLoading(false);
+      },
+      (error) => {
+        console.error('Failed to fetch dashboard tickets:', error);
+        setTickets([]);
+        setIsLoading(false);
+      },
+    );
+
+    return unsubscribe;
+  }, []);
+
+  const filteredTickets = useMemo(() => {
+    const queryText = searchQuery.trim().toLowerCase();
+
+    if (!queryText) {
+      return tickets;
+    }
+
+    return tickets.filter(
+      (ticket) =>
+        ticket.id.toLowerCase().includes(queryText) ||
+        ticket.status.toLowerCase().includes(queryText) ||
+        ticket.priority.toLowerCase().includes(queryText) ||
+        ticket.assignedTo.toLowerCase().includes(queryText),
+    );
+  }, [searchQuery, tickets]);
+
   const renderStatusBadge = (status: Ticket['status']) => (
-    <Badge label={status} variant={status === 'ASSIGNED' ? 'info' : 'success'} />
+    <Badge label={status} variant={status === 'ASSIGNED' ? 'info' : status === 'OPEN' ? 'assigned' : 'success'} />
   );
 
   const renderPriorityBadge = (priority: Ticket['priority']) => {
@@ -46,6 +98,10 @@ const DashboardScreen = (): React.JSX.Element => {
 
     if (priority === 'HIGH') {
       return <Badge label={priority} variant="warning" />;
+    }
+
+    if (priority === 'MEDIUM') {
+      return <Badge label={priority} variant="info" />;
     }
 
     return <Badge label={priority} variant="neutral" />;
@@ -65,9 +121,17 @@ const DashboardScreen = (): React.JSX.Element => {
       </View>
 
       <View style={styles.statsWrap}>
-        <StatCard title="TOTAL TICKETS" value={6} caption="Across your scoped queue" />
-        <StatCard title="OPEN WORKLOAD" value={4} caption="Active operational demand" />
-        <StatCard title="HIGH PRIORITY" value={4} caption="Needs immediate action" />
+        <StatCard title="TOTAL TICKETS" value={tickets.length} caption="Across your scoped queue" />
+        <StatCard
+          title="OPEN WORKLOAD"
+          value={tickets.filter((ticket) => ticket.status === 'OPEN' || ticket.status === 'ASSIGNED').length}
+          caption="Active operational demand"
+        />
+        <StatCard
+          title="HIGH PRIORITY"
+          value={tickets.filter((ticket) => ticket.priority === 'HIGH' || ticket.priority === 'CRITICAL').length}
+          caption="Needs immediate action"
+        />
       </View>
 
       <View style={styles.sectionCard}>
@@ -75,6 +139,8 @@ const DashboardScreen = (): React.JSX.Element => {
           <Ionicons name="search" size={16} color="#6B7280" />
           <TextInput
             style={styles.searchInput}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
             placeholder="Search tickets by ID, status, priority..."
             placeholderTextColor="#6B7280"
           />
@@ -100,32 +166,44 @@ const DashboardScreen = (): React.JSX.Element => {
       </View>
 
       <View style={styles.ticketList}>
-        {tickets.map((ticket) => (
-          <View key={ticket.id} style={styles.ticketCard}>
-            <View style={styles.ticketRowSpaceBetween}>
-              <Text style={styles.ticketId}>{ticket.id}</Text>
-              {renderStatusBadge(ticket.status)}
-            </View>
-
-            <View style={styles.ticketRowSpaceBetween}>
-              {renderPriorityBadge(ticket.priority)}
-              <Text style={styles.assignedTo}>{ticket.assignedTo}</Text>
-            </View>
-
-            <View style={styles.actionsRow}>
-              <ActionButton title="Details" style={styles.flexButton} />
-              <ActionButton title="Chat" style={styles.flexButton} />
-            </View>
-
-            <View style={styles.updateRow}>
-              <View style={styles.dropdownMock}>
-                <Text style={styles.dropdownText}>Select status</Text>
-                <Ionicons name="chevron-down" size={14} color="#9CA3AF" />
-              </View>
-              <ActionButton title="Update" variant="primary" style={styles.updateButton} />
-            </View>
+        {isLoading ? (
+          <View style={styles.centeredState}>
+            <ActivityIndicator color="#60A5FA" />
+            <Text style={styles.stateText}>Loading tickets...</Text>
           </View>
-        ))}
+        ) : filteredTickets.length === 0 ? (
+          <View style={styles.centeredState}>
+            <Ionicons name="ticket-outline" size={30} color="#6B7280" />
+            <Text style={styles.stateText}>No tickets found</Text>
+          </View>
+        ) : (
+          filteredTickets.map((ticket) => (
+            <View key={ticket.id} style={styles.ticketCard}>
+              <View style={styles.ticketRowSpaceBetween}>
+                <Text style={styles.ticketId}>{ticket.id}</Text>
+                {renderStatusBadge(ticket.status)}
+              </View>
+
+              <View style={styles.ticketRowSpaceBetween}>
+                {renderPriorityBadge(ticket.priority)}
+                <Text style={styles.assignedTo}>{ticket.assignedTo}</Text>
+              </View>
+
+              <View style={styles.actionsRow}>
+                <ActionButton title="Details" style={styles.flexButton} />
+                <ActionButton title="Chat" style={styles.flexButton} />
+              </View>
+
+              <View style={styles.updateRow}>
+                <View style={styles.dropdownMock}>
+                  <Text style={styles.dropdownText}>Select status</Text>
+                  <Ionicons name="chevron-down" size={14} color="#9CA3AF" />
+                </View>
+                <ActionButton title="Update" variant="primary" style={styles.updateButton} />
+              </View>
+            </View>
+          ))
+        )}
       </View>
     </ScrollView>
   );
@@ -238,6 +316,21 @@ const styles = StyleSheet.create({
   },
   ticketList: {
     gap: 10,
+  },
+  centeredState: {
+    minHeight: 120,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#1F2937',
+    backgroundColor: '#0B1220',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  stateText: {
+    color: '#9CA3AF',
+    fontSize: 14,
+    fontWeight: '500',
   },
   ticketCard: {
     backgroundColor: '#0B1220',
