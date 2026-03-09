@@ -13,7 +13,6 @@ import SelectField from '../components/SelectField';
 const DESCRIPTION_MAX = 5000;
 const DEFAULT_PRIORITY = 'MEDIUM' as const;
 const DEFAULT_LOCATION = 'No location captured yet';
-const DEFAULT_ATTACHMENT = 'No file chosen';
 const TICKETS_COLLECTION = 'tickets';
 
 type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
@@ -33,9 +32,12 @@ const TicketCreationScreen = (): React.JSX.Element => {
   const [priority, setPriority] = useState<TicketPriority>(DEFAULT_PRIORITY);
   const [category, setCategory] = useState('');
   const [location, setLocation] = useState(DEFAULT_LOCATION);
-  const [attachment, setAttachment] = useState(DEFAULT_ATTACHMENT);
+  const [locationCoordinates, setLocationCoordinates] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [attachmentInput, setAttachmentInput] = useState('');
+  const [attachments, setAttachments] = useState<string[]>([]);
   const [errors, setErrors] = useState<{ title?: string; description?: string; priority?: string; category?: string }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isResolvingLocation, setIsResolvingLocation] = useState(false);
 
   const descriptionLength = description.length;
 
@@ -47,8 +49,76 @@ const TicketCreationScreen = (): React.JSX.Element => {
     setPriority(DEFAULT_PRIORITY);
     setCategory('');
     setLocation(DEFAULT_LOCATION);
-    setAttachment(DEFAULT_ATTACHMENT);
+    setLocationCoordinates(null);
+    setAttachmentInput('');
+    setAttachments([]);
     setErrors({});
+  };
+
+  const handleUseCurrentLocation = (): void => {
+    if (isResolvingLocation) {
+      return;
+    }
+
+    if (!navigator?.geolocation) {
+      Alert.alert('Location unavailable', 'Location services are not available on this device.');
+      return;
+    }
+
+    setIsResolvingLocation(true);
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const latitude = position.coords.latitude;
+        const longitude = position.coords.longitude;
+
+        setLocationCoordinates({ latitude, longitude });
+
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=jsonv2`,
+            {
+              headers: {
+                Accept: 'application/json',
+              },
+            },
+          );
+
+          if (!response.ok) {
+            throw new Error('Failed to reverse geocode coordinates');
+          }
+
+          const payload = await response.json();
+          const displayName = payload?.display_name as string | undefined;
+
+          setLocation(displayName ? `${displayName}\nLat: ${latitude.toFixed(6)}, Lng: ${longitude.toFixed(6)}` : `Lat: ${latitude.toFixed(6)}, Lng: ${longitude.toFixed(6)}`);
+        } catch {
+          setLocation(`Lat: ${latitude.toFixed(6)}, Lng: ${longitude.toFixed(6)}`);
+        } finally {
+          setIsResolvingLocation(false);
+        }
+      },
+      () => {
+        Alert.alert('Location permission required', 'Please allow location access to capture your exact location.');
+        setIsResolvingLocation(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+      },
+    );
+  };
+
+  const handleAddAttachment = (): void => {
+    const value = attachmentInput.trim();
+
+    if (!value) {
+      Alert.alert('Attachment required', 'Enter file name or URL to add attachment.');
+      return;
+    }
+
+    setAttachments((prev) => (prev.includes(value) ? prev : [...prev, value]));
+    setAttachmentInput('');
   };
 
   const validateForm = (): boolean => {
@@ -103,6 +173,9 @@ const TicketCreationScreen = (): React.JSX.Element => {
         description: description.trim(),
         priority,
         category: category.trim(),
+        location,
+        locationCoordinates,
+        attachments,
         createdBy: 'dev-user',
         createdAt: serverTimestamp(),
         status: 'OPEN',
@@ -200,14 +273,38 @@ const TicketCreationScreen = (): React.JSX.Element => {
 
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>Location</Text>
-            <Button title="Use Current Location" onPress={() => setLocation('Delhi, India')} variant="secondary" />
+            <Button
+              title={isResolvingLocation ? 'Capturing Location...' : 'Use Current Location'}
+              onPress={handleUseCurrentLocation}
+              variant="secondary"
+              disabled={isResolvingLocation}
+            />
             <Text style={styles.sectionValue}>{location}</Text>
           </View>
 
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>Attachments</Text>
-            <Button title="Choose Files" onPress={() => setAttachment('incident-report.pdf')} variant="secondary" />
-            <Text style={styles.sectionValue}>{attachment}</Text>
+            <InputField
+              label="Attachment file name or URL"
+              placeholder="e.g. incident-report.pdf or https://..."
+              value={attachmentInput}
+              onChangeText={setAttachmentInput}
+            />
+            <Button title="Add Attachment" onPress={handleAddAttachment} variant="secondary" />
+            {attachments.length === 0 ? (
+              <Text style={styles.sectionValue}>No files attached</Text>
+            ) : (
+              <View style={styles.attachmentList}>
+                {attachments.map((item) => (
+                  <View key={item} style={styles.attachmentRow}>
+                    <Text style={styles.attachmentText}>{item}</Text>
+                    <Pressable onPress={() => setAttachments((prev) => prev.filter((entry) => entry !== item))}>
+                      <Text style={styles.removeAttachment}>Remove</Text>
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
+            )}
             <Text style={styles.helperText}>PNG, JPG, PDF, DOC up to 5MB</Text>
           </View>
 
@@ -310,6 +407,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     marginTop: 8,
+  },
+  attachmentList: {
+    marginTop: 10,
+    gap: 8,
+  },
+  attachmentRow: {
+    borderWidth: 1,
+    borderColor: '#1F2937',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#111827',
+  },
+  attachmentText: {
+    color: '#E5E7EB',
+    flex: 1,
+    marginRight: 12,
+  },
+  removeAttachment: {
+    color: '#FCA5A5',
+    fontWeight: '600',
   },
   footerButton: {
     flex: 1,
