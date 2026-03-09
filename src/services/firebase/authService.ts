@@ -12,6 +12,8 @@ import { doc, getDoc } from 'firebase/firestore';
 import { auth, firestore } from './firebase';
 
 const EMAIL_STORAGE_KEY = 'auth_email_for_signin';
+const DEFAULT_DYNAMIC_LINK_DOMAIN = 'yourapp.page.link';
+const DEFAULT_ANDROID_PACKAGE = 'com.yourcompany.yourapp';
 
 export type AuthUserProfile = {
   user: string;
@@ -41,21 +43,42 @@ const mapAuthErrorMessage = (error: unknown): string => {
   }
 };
 
-const buildEmailLinkUrl = (): string => {
-  const authDomain = process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN;
+const getDynamicLinkDomain = (): string => {
+  return process.env.EXPO_PUBLIC_FIREBASE_DYNAMIC_LINK_DOMAIN ?? DEFAULT_DYNAMIC_LINK_DOMAIN;
+};
 
-  if (authDomain) {
-    const normalizedAuthDomain = authDomain.replace(/^https?:\/\//, '');
-    return `https://${normalizedAuthDomain}/auth-complete`;
+const buildEmailLinkUrl = (): string => {
+  return `https://${getDynamicLinkDomain()}/auth-complete`;
+};
+
+const normalizeSignInLink = (incomingLink: string): string | null => {
+  if (isSignInWithEmailLink(auth, incomingLink)) {
+    return incomingLink;
   }
 
-  return 'https://localhost/auth-complete';
+  const { queryParams } = Linking.parse(incomingLink);
+  const nestedLink = queryParams.link;
+
+  if (typeof nestedLink === 'string') {
+    const decodedNestedLink = decodeURIComponent(nestedLink);
+    if (isSignInWithEmailLink(auth, decodedNestedLink)) {
+      return decodedNestedLink;
+    }
+  }
+
+  return null;
 };
 
 export const sendLoginLink = async (email: string): Promise<void> => {
   const actionCodeSettings = {
     url: buildEmailLinkUrl(),
     handleCodeInApp: true,
+    android: {
+      packageName: process.env.EXPO_PUBLIC_ANDROID_PACKAGE ?? DEFAULT_ANDROID_PACKAGE,
+      installApp: true,
+      minimumVersion: '1',
+    },
+    dynamicLinkDomain: getDynamicLinkDomain(),
   };
 
   try {
@@ -79,7 +102,8 @@ export const completeSignInWithEmailLink = async (url?: string): Promise<AuthUse
   const link = url ?? (await Linking.getInitialURL());
   console.log('[AUTH] Initial URL:', link);
   console.log('[AUTH] Checking if URL is sign-in link');
-  const isSignInLink = !!link && isSignInWithEmailLink(auth, link);
+  const normalizedLink = link ? normalizeSignInLink(link) : null;
+  const isSignInLink = !!normalizedLink;
   console.log('[AUTH] isSignInWithEmailLink:', isSignInLink);
 
   if (!isSignInLink) {
@@ -97,7 +121,7 @@ export const completeSignInWithEmailLink = async (url?: string): Promise<AuthUse
   console.log('[AUTH] Stored email:', storedEmail);
 
   try {
-    const credential = await signInWithEmailLink(auth, storedEmail, link);
+    const credential = await signInWithEmailLink(auth, storedEmail, normalizedLink);
     console.log('[AUTH] Firebase sign-in successful');
     console.log('[AUTH] User UID:', credential.user.uid);
     console.log('[AUTH] User email:', credential.user.email);
