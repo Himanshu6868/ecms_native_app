@@ -9,6 +9,7 @@ import { firestore } from '../services/firebase/firebase';
 import Button from '../components/Button';
 import InputField from '../components/InputField';
 import SelectField from '../components/SelectField';
+import { useAuthStore } from '../store/useAuthStore';
 
 const DESCRIPTION_MAX = 5000;
 const DEFAULT_PRIORITY = 'MEDIUM' as const;
@@ -26,6 +27,7 @@ const priorityOptions = [
 
 const TicketCreationScreen = (): React.JSX.Element => {
   const navigation = useNavigation();
+  const { user, email } = useAuthStore();
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -165,6 +167,11 @@ const TicketCreationScreen = (): React.JSX.Element => {
       return;
     }
 
+    if (!user) {
+      Alert.alert('Sign-in required', 'Please sign in again before submitting a ticket.');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -176,7 +183,8 @@ const TicketCreationScreen = (): React.JSX.Element => {
         location,
         locationCoordinates,
         attachments,
-        createdBy: 'dev-user',
+        createdBy: user,
+        createdByEmail: email,
         createdAt: serverTimestamp(),
         status: 'OPEN',
       });
@@ -185,7 +193,11 @@ const TicketCreationScreen = (): React.JSX.Element => {
       resetForm();
     } catch (error) {
       console.error('Ticket Submit Error:', error);
-      Alert.alert('Error', 'Failed to submit ticket. Please try again.');
+
+      const maybeFirebaseError = error as { code?: string; message?: string };
+      const details = maybeFirebaseError?.code ? `\n(${maybeFirebaseError.code})` : '';
+
+      Alert.alert('Error', `Failed to submit ticket. Please try again.${details}`);
     } finally {
       setIsSubmitting(false);
     }
