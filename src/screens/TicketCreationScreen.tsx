@@ -4,13 +4,12 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { addDoc, collection, GeoPoint, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 
 import { firestore } from '../services/firebase/firebase';
 import Button from '../components/Button';
 import InputField from '../components/InputField';
 import SelectField from '../components/SelectField';
-import { useAuthStore } from '../store/useAuthStore';
 
 const DESCRIPTION_MAX = 5000;
 const DEFAULT_PRIORITY = 'MEDIUM' as const;
@@ -27,16 +26,13 @@ const priorityOptions = [
 
 const TicketCreationScreen = (): React.JSX.Element => {
   const navigation = useNavigation();
-  const { user, email } = useAuthStore();
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<TicketPriority>(DEFAULT_PRIORITY);
   const [category, setCategory] = useState('');
   const [location, setLocation] = useState<string | null>(null);
-  const [locationCoordinates, setLocationCoordinates] = useState<GeoPoint | null>(null);
-  const [attachmentInput, setAttachmentInput] = useState('');
-  const [attachments, setAttachments] = useState<string[]>([]);
+  const [locationCoordinates, setLocationCoordinates] = useState<[number, number] | null>(null);
   const [errors, setErrors] = useState<{ title?: string; description?: string; priority?: string; category?: string }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isResolvingLocation, setIsResolvingLocation] = useState(false);
@@ -52,8 +48,6 @@ const TicketCreationScreen = (): React.JSX.Element => {
     setCategory('');
     setLocation(null);
     setLocationCoordinates(null);
-    setAttachmentInput('');
-    setAttachments([]);
     setErrors({});
   };
 
@@ -76,10 +70,10 @@ const TicketCreationScreen = (): React.JSX.Element => {
         accuracy: Location.Accuracy.High,
       });
 
-      const latitude = position.coords.latitude;
-      const longitude = position.coords.longitude;
+      const latitude = Number(position.coords.latitude.toFixed(6));
+      const longitude = Number(position.coords.longitude.toFixed(6));
 
-      setLocationCoordinates(new GeoPoint(latitude, longitude));
+      setLocationCoordinates([latitude, longitude]);
       setLocation(`${latitude},${longitude}`);
     } catch (error: unknown) {
       console.error('Location fetch error:', error);
@@ -87,18 +81,6 @@ const TicketCreationScreen = (): React.JSX.Element => {
     } finally {
       setIsResolvingLocation(false);
     }
-  };
-
-  const handleAddAttachment = (): void => {
-    const value = attachmentInput.trim();
-
-    if (!value) {
-      setAttachments(['https://example.com/test-file.pdf']);
-      return;
-    }
-
-    setAttachments((prev) => (prev.includes(value) ? prev : [...prev, value]));
-    setAttachmentInput('');
   };
 
   const validateForm = (): boolean => {
@@ -132,17 +114,6 @@ const TicketCreationScreen = (): React.JSX.Element => {
       return;
     }
 
-    console.log('Submitting ticket...');
-    console.log('Form values:', {
-      title,
-      description,
-      priority,
-      category,
-      location,
-      locationCoordinates,
-      attachments,
-    });
-
     if (!validateForm()) {
       Alert.alert('Validation Error', 'Please fill all required fields');
       return;
@@ -158,21 +129,9 @@ const TicketCreationScreen = (): React.JSX.Element => {
         category: category.trim(),
         location: location ?? null,
         locationCoordinates: locationCoordinates ?? null,
-        attachments: Array.isArray(attachments) ? attachments : [],
-        createdBy: user ?? 'anonymous',
-        createdByEmail: email ?? null,
         createdAt: serverTimestamp(),
         status: 'OPEN',
       };
-
-      console.log('Final payload check:', payload);
-
-      if (__DEV__) {
-        await addDoc(collection(firestore, TICKETS_COLLECTION), {
-          test: 'ok',
-          createdAt: serverTimestamp(),
-        });
-      }
 
       await addDoc(collection(firestore, TICKETS_COLLECTION), payload);
 
@@ -285,32 +244,6 @@ const TicketCreationScreen = (): React.JSX.Element => {
             <Text style={styles.sectionValue}>{location ?? 'No location captured yet'}</Text>
           </View>
 
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Attachments</Text>
-            <InputField
-              label="Attachment file name or URL"
-              placeholder="e.g. incident-report.pdf or https://..."
-              value={attachmentInput}
-              onChangeText={setAttachmentInput}
-            />
-            <Button title="Add Attachment" onPress={handleAddAttachment} variant="secondary" />
-            {attachments.length === 0 ? (
-              <Text style={styles.sectionValue}>No files attached</Text>
-            ) : (
-              <View style={styles.attachmentList}>
-                {attachments.map((item) => (
-                  <View key={item} style={styles.attachmentRow}>
-                    <Text style={styles.attachmentText}>{item}</Text>
-                    <Pressable onPress={() => setAttachments((prev) => prev.filter((entry) => entry !== item))}>
-                      <Text style={styles.removeAttachment}>Remove</Text>
-                    </Pressable>
-                  </View>
-                ))}
-              </View>
-            )}
-            <Text style={styles.helperText}>PNG, JPG, PDF, DOC up to 5MB</Text>
-          </View>
-
           <View style={styles.footerActions}>
             <Button title="Clear Form" onPress={resetForm} variant="secondary" style={styles.footerButton} />
             <Button
@@ -401,39 +334,10 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 13,
   },
-  helperText: {
-    color: '#6B7280',
-    marginTop: 6,
-    fontSize: 12,
-  },
   footerActions: {
     flexDirection: 'row',
     gap: 12,
     marginTop: 8,
-  },
-  attachmentList: {
-    marginTop: 10,
-    gap: 8,
-  },
-  attachmentRow: {
-    borderWidth: 1,
-    borderColor: '#1F2937',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#111827',
-  },
-  attachmentText: {
-    color: '#E5E7EB',
-    flex: 1,
-    marginRight: 12,
-  },
-  removeAttachment: {
-    color: '#FCA5A5',
-    fontWeight: '600',
   },
   footerButton: {
     flex: 1,
