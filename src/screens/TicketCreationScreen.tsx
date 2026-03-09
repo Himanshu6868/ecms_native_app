@@ -1,17 +1,22 @@
 import React, { useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Keyboard, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 
+import { firestore } from '../services/firebase/firebase';
 import Button from '../components/Button';
 import InputField from '../components/InputField';
 import SelectField from '../components/SelectField';
 
 const DESCRIPTION_MAX = 5000;
-const DEFAULT_PRIORITY = 'MEDIUM';
+const DEFAULT_PRIORITY = 'MEDIUM' as const;
 const DEFAULT_LOCATION = 'No location captured yet';
 const DEFAULT_ATTACHMENT = 'No file chosen';
+const TICKETS_COLLECTION = 'tickets';
+
+type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
 const priorityOptions = [
   { label: 'LOW', value: 'LOW' },
@@ -23,36 +28,46 @@ const priorityOptions = [
 const TicketCreationScreen = (): React.JSX.Element => {
   const navigation = useNavigation();
 
+  const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [priority, setPriority] = useState(DEFAULT_PRIORITY);
+  const [priority, setPriority] = useState<TicketPriority>(DEFAULT_PRIORITY);
+  const [category, setCategory] = useState('');
   const [location, setLocation] = useState(DEFAULT_LOCATION);
   const [attachment, setAttachment] = useState(DEFAULT_ATTACHMENT);
-  const [errors, setErrors] = useState<{ description?: string; priority?: string }>({});
-  const [isSuccessVisible, setIsSuccessVisible] = useState(false);
+  const [errors, setErrors] = useState<{ title?: string; description?: string; priority?: string; category?: string }>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const descriptionLength = description.length;
 
   const isDescriptionTooShort = useMemo(() => description.trim().length > 0 && description.trim().length < 20, [description]);
 
   const resetForm = (): void => {
+    setTitle('');
     setDescription('');
     setPriority(DEFAULT_PRIORITY);
+    setCategory('');
     setLocation(DEFAULT_LOCATION);
     setAttachment(DEFAULT_ATTACHMENT);
     setErrors({});
   };
 
   const validateForm = (): boolean => {
-    const nextErrors: { description?: string; priority?: string } = {};
+    const nextErrors: { title?: string; description?: string; priority?: string; category?: string } = {};
+
+    if (!title.trim()) {
+      nextErrors.title = 'Title is required';
+    }
 
     if (!description.trim()) {
       nextErrors.description = 'Issue description is required';
-    } else if (description.trim().length < 20) {
-      nextErrors.description = 'Description too short';
     }
 
     if (!priority) {
       nextErrors.priority = 'Priority is required';
+    }
+
+    if (!category.trim()) {
+      nextErrors.category = 'Category is required';
     }
 
     setErrors(nextErrors);
@@ -60,17 +75,56 @@ const TicketCreationScreen = (): React.JSX.Element => {
     return Object.keys(nextErrors).length === 0;
   };
 
-  const handleSubmit = (): void => {
-    if (!validateForm()) {
+  const handleSubmit = async (): Promise<void> => {
+    Keyboard.dismiss();
+    console.log('[TicketCreation] Submit requested');
+
+    if (isSubmitting) {
+      console.log('[TicketCreation] Submission blocked because a request is already in progress');
       return;
     }
 
-    setIsSuccessVisible(true);
-  };
+    if (!validateForm()) {
+      console.log('[TicketCreation] Validation failed', {
+        title: title.trim(),
+        descriptionLength: description.trim().length,
+        priority,
+        category: category.trim(),
+      });
+      Alert.alert('Validation', 'Please fill all required fields');
+      return;
+    }
 
-  const handleSuccessAcknowledge = (): void => {
-    setIsSuccessVisible(false);
-    resetForm();
+    const payload = {
+      title: title.trim(),
+      description: description.trim(),
+      priority,
+      category: category.trim(),
+      createdBy: 'dev-user',
+      createdAt: serverTimestamp(),
+      status: 'OPEN' as const,
+    };
+
+    console.log('[TicketCreation] Writing ticket to Firestore collection', TICKETS_COLLECTION, {
+      ...payload,
+      createdAt: 'serverTimestamp()',
+    });
+
+    setIsSubmitting(true);
+
+    try {
+      const docRef = await addDoc(collection(firestore, TICKETS_COLLECTION), payload);
+      console.log('[TicketCreation] Firestore write successful. Document ID:', docRef.id);
+
+      Alert.alert('Success', 'Ticket submitted successfully');
+      resetForm();
+    } catch (error) {
+      console.error('[TicketCreation] Firestore write failed', error);
+      Alert.alert('Error', 'Failed to submit ticket. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+      console.log('[TicketCreation] Submit flow complete');
+    }
   };
 
   return (
@@ -99,6 +153,19 @@ const TicketCreationScreen = (): React.JSX.Element => {
           <Text style={styles.subtitle}>Capture issue details and submit for resolution.</Text>
 
           <InputField
+            label="Ticket Title (Required)"
+            placeholder="Enter a short ticket title"
+            value={title}
+            onChangeText={(text) => {
+              setTitle(text);
+              if (errors.title) {
+                setErrors((prev) => ({ ...prev, title: undefined }));
+              }
+            }}
+            error={errors.title}
+          />
+
+          <InputField
             label="Issue Description (Required)"
             placeholder="Describe what happened, impact, and workaround attempted"
             multiline
@@ -118,13 +185,26 @@ const TicketCreationScreen = (): React.JSX.Element => {
             label="Priority (Required)"
             value={priority}
             onChange={(selectedValue) => {
-              setPriority(selectedValue);
+              setPriority(selectedValue as TicketPriority);
               if (errors.priority) {
                 setErrors((prev) => ({ ...prev, priority: undefined }));
               }
             }}
             options={priorityOptions}
             error={errors.priority}
+          />
+
+          <InputField
+            label="Category (Required)"
+            placeholder="e.g. Network, Hardware, Software"
+            value={category}
+            onChangeText={(text) => {
+              setCategory(text);
+              if (errors.category) {
+                setErrors((prev) => ({ ...prev, category: undefined }));
+              }
+            }}
+            error={errors.category}
           />
 
           <View style={styles.section}>
@@ -142,20 +222,17 @@ const TicketCreationScreen = (): React.JSX.Element => {
 
           <View style={styles.footerActions}>
             <Button title="Clear Form" onPress={resetForm} variant="secondary" style={styles.footerButton} />
-            <Button title="Submit Ticket" onPress={handleSubmit} style={styles.footerButton} />
+            <Button
+              title={isSubmitting ? 'Submitting...' : 'Submit Ticket'}
+              onPress={() => {
+                void handleSubmit();
+              }}
+              style={styles.footerButton}
+              disabled={isSubmitting}
+            />
           </View>
         </ScrollView>
       </View>
-
-      <Modal transparent visible={isSuccessVisible} animationType="fade" onRequestClose={() => {}}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Ticket Submitted</Text>
-            <Text style={styles.modalMessage}>Your ticket has been created successfully.</Text>
-            <Button title="OK" onPress={handleSuccessAcknowledge} />
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 };
@@ -245,32 +322,6 @@ const styles = StyleSheet.create({
   },
   footerButton: {
     flex: 1,
-  },
-  modalBackdrop: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(3, 7, 18, 0.75)',
-    padding: 20,
-  },
-  modalCard: {
-    width: '100%',
-    backgroundColor: '#111827',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#374151',
-    padding: 20,
-    gap: 16,
-  },
-  modalTitle: {
-    color: '#F9FAFB',
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  modalMessage: {
-    color: '#D1D5DB',
-    fontSize: 14,
-    lineHeight: 20,
   },
 });
 
