@@ -18,8 +18,6 @@ const TICKETS_COLLECTION = 'tickets';
 
 type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
-type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-
 const priorityOptions = [
   { label: 'LOW', value: 'LOW' },
   { label: 'MEDIUM', value: 'MEDIUM' },
@@ -84,15 +82,23 @@ const TicketCreationScreen = (): React.JSX.Element => {
       return;
     }
 
+    console.log('Submitting ticket...');
+    console.log('Form values:', {
+      title,
+      description,
+      priority,
+      category,
+    });
+
     if (!validateForm()) {
-      Alert.alert('Validation', 'Please fill all required fields');
+      Alert.alert('Validation Error', 'Please fill all required fields');
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      await addDoc(collection(firestore, 'tickets'), {
+      await addDoc(collection(firestore, TICKETS_COLLECTION), {
         title: title.trim(),
         description: description.trim(),
         priority,
@@ -105,8 +111,8 @@ const TicketCreationScreen = (): React.JSX.Element => {
       Alert.alert('Success', 'Ticket submitted successfully');
       resetForm();
     } catch (error) {
+      console.error('Ticket Submit Error:', error);
       Alert.alert('Error', 'Failed to submit ticket. Please try again.');
-      console.error(error);
     } finally {
       setIsSubmitting(false);
     }
