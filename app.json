@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "ecmsnativeapp",
+    "scheme": "ecms",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -29,11 +29,26 @@
           ],
           "data": [
             {
-              "scheme": "ecmsnativeapp"
+              "scheme": "ecms"
             }
           ]
+        },
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "yourapp.page.link"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
-      ]
+      ],
+      "package": "com.yourcompany.yourapp"
     },
     "web": {
       "output": "static",
