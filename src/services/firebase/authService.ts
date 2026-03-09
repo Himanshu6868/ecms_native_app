@@ -43,13 +43,14 @@ const mapAuthErrorMessage = (error: unknown): string => {
   }
 };
 
-const getDynamicLinkDomain = (): string => {
-  return process.env.EXPO_PUBLIC_FIREBASE_DYNAMIC_LINK_DOMAIN ?? DEFAULT_DYNAMIC_LINK_DOMAIN;
-};
-
 const getAuthorizedAuthDomain = (): string | null => {
   const authDomain = process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN;
   return authDomain ? `https://${authDomain}` : null;
+};
+
+const getConfiguredDynamicLinkDomain = (): string | null => {
+  const configuredDomain = process.env.EXPO_PUBLIC_FIREBASE_DYNAMIC_LINK_DOMAIN;
+  return configuredDomain && configuredDomain !== DEFAULT_DYNAMIC_LINK_DOMAIN ? configuredDomain : null;
 };
 
 const buildEmailLinkUrl = (): string => {
@@ -61,14 +62,21 @@ const buildEmailLinkUrl = (): string => {
 
   const authDomainUrl = getAuthorizedAuthDomain();
   if (authDomainUrl) {
-    return `${authDomainUrl}/auth-complete`;
+    // Firebase always serves this endpoint, even when Hosting is not configured.
+    // Using /auth-complete requires a deployed Hosting site and can 404.
+    return `${authDomainUrl}/__/auth/action`;
   }
 
-  return `https://${getDynamicLinkDomain()}/auth-complete`;
+  const dynamicLinkDomain = getConfiguredDynamicLinkDomain();
+  if (dynamicLinkDomain) {
+    return `https://${dynamicLinkDomain}/auth-complete`;
+  }
+
+  throw new Error('Firebase email-link login is missing configuration. Set EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN or EXPO_PUBLIC_FIREBASE_CONTINUE_URL.');
 };
 
 const shouldAttachDynamicLinkDomain = (): boolean => {
-  return getDynamicLinkDomain() !== DEFAULT_DYNAMIC_LINK_DOMAIN;
+  return !!getConfiguredDynamicLinkDomain();
 };
 
 const normalizeSignInLink = (incomingLink: string): string | null => {
@@ -110,7 +118,7 @@ export const sendLoginLink = async (email: string): Promise<void> => {
   };
 
   if (shouldAttachDynamicLinkDomain()) {
-    actionCodeSettings.dynamicLinkDomain = getDynamicLinkDomain();
+    actionCodeSettings.dynamicLinkDomain = getConfiguredDynamicLinkDomain() ?? undefined;
   }
 
   try {
