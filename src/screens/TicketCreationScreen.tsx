@@ -167,11 +167,6 @@ const TicketCreationScreen = (): React.JSX.Element => {
       return;
     }
 
-    if (!user) {
-      Alert.alert('Sign-in required', 'Please sign in again before submitting a ticket.');
-      return;
-    }
-
     setIsSubmitting(true);
 
     try {
@@ -183,8 +178,8 @@ const TicketCreationScreen = (): React.JSX.Element => {
         location,
         locationCoordinates,
         attachments,
-        createdBy: user,
-        createdByEmail: email,
+        createdBy: user ?? 'anonymous',
+        createdByEmail: email ?? null,
         createdAt: serverTimestamp(),
         status: 'OPEN',
       });
