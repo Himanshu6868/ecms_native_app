@@ -47,8 +47,28 @@ const getDynamicLinkDomain = (): string => {
   return process.env.EXPO_PUBLIC_FIREBASE_DYNAMIC_LINK_DOMAIN ?? DEFAULT_DYNAMIC_LINK_DOMAIN;
 };
 
+const getAuthorizedAuthDomain = (): string | null => {
+  const authDomain = process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN;
+  return authDomain ? `https://${authDomain}` : null;
+};
+
 const buildEmailLinkUrl = (): string => {
+  const explicitContinueUrl = process.env.EXPO_PUBLIC_FIREBASE_CONTINUE_URL;
+
+  if (explicitContinueUrl) {
+    return explicitContinueUrl;
+  }
+
+  const authDomainUrl = getAuthorizedAuthDomain();
+  if (authDomainUrl) {
+    return `${authDomainUrl}/auth-complete`;
+  }
+
   return `https://${getDynamicLinkDomain()}/auth-complete`;
+};
+
+const shouldAttachDynamicLinkDomain = (): boolean => {
+  return getDynamicLinkDomain() !== DEFAULT_DYNAMIC_LINK_DOMAIN;
 };
 
 const normalizeSignInLink = (incomingLink: string): string | null => {
@@ -70,7 +90,16 @@ const normalizeSignInLink = (incomingLink: string): string | null => {
 };
 
 export const sendLoginLink = async (email: string): Promise<void> => {
-  const actionCodeSettings = {
+  const actionCodeSettings: {
+    url: string;
+    handleCodeInApp: boolean;
+    android: {
+      packageName: string;
+      installApp: boolean;
+      minimumVersion: string;
+    };
+    dynamicLinkDomain?: string;
+  } = {
     url: buildEmailLinkUrl(),
     handleCodeInApp: true,
     android: {
@@ -78,8 +107,11 @@ export const sendLoginLink = async (email: string): Promise<void> => {
       installApp: true,
       minimumVersion: '1',
     },
-    dynamicLinkDomain: getDynamicLinkDomain(),
   };
+
+  if (shouldAttachDynamicLinkDomain()) {
+    actionCodeSettings.dynamicLinkDomain = getDynamicLinkDomain();
+  }
 
   try {
     console.log('[AUTH] Preparing actionCodeSettings');
