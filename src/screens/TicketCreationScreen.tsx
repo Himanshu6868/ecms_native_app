@@ -18,6 +18,8 @@ const TICKETS_COLLECTION = 'tickets';
 
 type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
+type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+
 const priorityOptions = [
   { label: 'LOW', value: 'LOW' },
   { label: 'MEDIUM', value: 'MEDIUM' },
@@ -77,53 +79,36 @@ const TicketCreationScreen = (): React.JSX.Element => {
 
   const handleSubmit = async (): Promise<void> => {
     Keyboard.dismiss();
-    console.log('[TicketCreation] Submit requested');
 
     if (isSubmitting) {
-      console.log('[TicketCreation] Submission blocked because a request is already in progress');
       return;
     }
 
     if (!validateForm()) {
-      console.log('[TicketCreation] Validation failed', {
-        title: title.trim(),
-        descriptionLength: description.trim().length,
-        priority,
-        category: category.trim(),
-      });
       Alert.alert('Validation', 'Please fill all required fields');
       return;
     }
 
-    const payload = {
-      title: title.trim(),
-      description: description.trim(),
-      priority,
-      category: category.trim(),
-      createdBy: 'dev-user',
-      createdAt: serverTimestamp(),
-      status: 'OPEN' as const,
-    };
-
-    console.log('[TicketCreation] Writing ticket to Firestore collection', TICKETS_COLLECTION, {
-      ...payload,
-      createdAt: 'serverTimestamp()',
-    });
-
     setIsSubmitting(true);
 
     try {
-      const docRef = await addDoc(collection(firestore, TICKETS_COLLECTION), payload);
-      console.log('[TicketCreation] Firestore write successful. Document ID:', docRef.id);
+      await addDoc(collection(firestore, 'tickets'), {
+        title: title.trim(),
+        description: description.trim(),
+        priority,
+        category: category.trim(),
+        createdBy: 'dev-user',
+        createdAt: serverTimestamp(),
+        status: 'OPEN',
+      });
 
       Alert.alert('Success', 'Ticket submitted successfully');
       resetForm();
     } catch (error) {
-      console.error('[TicketCreation] Firestore write failed', error);
       Alert.alert('Error', 'Failed to submit ticket. Please try again.');
+      console.error(error);
     } finally {
       setIsSubmitting(false);
-      console.log('[TicketCreation] Submit flow complete');
     }
   };
 
