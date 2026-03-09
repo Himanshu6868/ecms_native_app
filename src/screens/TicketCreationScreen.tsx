@@ -14,6 +14,9 @@ const DESCRIPTION_MAX = 5000;
 const DEFAULT_PRIORITY = 'MEDIUM' as const;
 const DEFAULT_LOCATION = 'No location captured yet';
 const DEFAULT_ATTACHMENT = 'No file chosen';
+const TICKETS_COLLECTION = 'tickets';
+
+type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
 type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
