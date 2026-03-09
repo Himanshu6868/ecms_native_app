@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { Alert, Keyboard, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, GeoPoint, serverTimestamp } from 'firebase/firestore';
 
 import { firestore } from '../services/firebase/firebase';
 import Button from '../components/Button';
@@ -13,7 +14,6 @@ import { useAuthStore } from '../store/useAuthStore';
 
 const DESCRIPTION_MAX = 5000;
 const DEFAULT_PRIORITY = 'MEDIUM' as const;
-const DEFAULT_LOCATION = 'No location captured yet';
 const TICKETS_COLLECTION = 'tickets';
 
 type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
@@ -33,8 +33,8 @@ const TicketCreationScreen = (): React.JSX.Element => {
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<TicketPriority>(DEFAULT_PRIORITY);
   const [category, setCategory] = useState('');
-  const [location, setLocation] = useState(DEFAULT_LOCATION);
-  const [locationCoordinates, setLocationCoordinates] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [location, setLocation] = useState<string | null>(null);
+  const [locationCoordinates, setLocationCoordinates] = useState<GeoPoint | null>(null);
   const [attachmentInput, setAttachmentInput] = useState('');
   const [attachments, setAttachments] = useState<string[]>([]);
   const [errors, setErrors] = useState<{ title?: string; description?: string; priority?: string; category?: string }>({});
@@ -50,72 +50,50 @@ const TicketCreationScreen = (): React.JSX.Element => {
     setDescription('');
     setPriority(DEFAULT_PRIORITY);
     setCategory('');
-    setLocation(DEFAULT_LOCATION);
+    setLocation(null);
     setLocationCoordinates(null);
     setAttachmentInput('');
     setAttachments([]);
     setErrors({});
   };
 
-  const handleUseCurrentLocation = (): void => {
+  const getCurrentLocation = async (): Promise<void> => {
     if (isResolvingLocation) {
-      return;
-    }
-
-    if (!navigator?.geolocation) {
-      Alert.alert('Location unavailable', 'Location services are not available on this device.');
       return;
     }
 
     setIsResolvingLocation(true);
 
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const latitude = position.coords.latitude;
-        const longitude = position.coords.longitude;
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
 
-        setLocationCoordinates({ latitude, longitude });
-
-        try {
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=jsonv2`,
-            {
-              headers: {
-                Accept: 'application/json',
-              },
-            },
-          );
-
-          if (!response.ok) {
-            throw new Error('Failed to reverse geocode coordinates');
-          }
-
-          const payload = await response.json();
-          const displayName = payload?.display_name as string | undefined;
-
-          setLocation(displayName ? `${displayName}\nLat: ${latitude.toFixed(6)}, Lng: ${longitude.toFixed(6)}` : `Lat: ${latitude.toFixed(6)}, Lng: ${longitude.toFixed(6)}`);
-        } catch {
-          setLocation(`Lat: ${latitude.toFixed(6)}, Lng: ${longitude.toFixed(6)}`);
-        } finally {
-          setIsResolvingLocation(false);
-        }
-      },
-      () => {
+      if (status !== 'granted') {
         Alert.alert('Location permission required', 'Please allow location access to capture your exact location.');
-        setIsResolvingLocation(false);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 15000,
-      },
-    );
+        return;
+      }
+
+      const position = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+
+      const latitude = position.coords.latitude;
+      const longitude = position.coords.longitude;
+
+      setLocationCoordinates(new GeoPoint(latitude, longitude));
+      setLocation(`${latitude},${longitude}`);
+    } catch (error: unknown) {
+      console.error('Location fetch error:', error);
+      Alert.alert('Location unavailable', 'Unable to capture your current location. Please try again.');
+    } finally {
+      setIsResolvingLocation(false);
+    }
   };
 
   const handleAddAttachment = (): void => {
     const value = attachmentInput.trim();
 
     if (!value) {
-      Alert.alert('Attachment required', 'Enter file name or URL to add attachment.');
+      setAttachments(['https://example.com/test-file.pdf']);
       return;
     }
 
@@ -160,6 +138,9 @@ const TicketCreationScreen = (): React.JSX.Element => {
       description,
       priority,
       category,
+      location,
+      locationCoordinates,
+      attachments,
     });
 
     if (!validateForm()) {
@@ -170,24 +151,39 @@ const TicketCreationScreen = (): React.JSX.Element => {
     setIsSubmitting(true);
 
     try {
-      await addDoc(collection(firestore, TICKETS_COLLECTION), {
+      const payload = {
         title: title.trim(),
         description: description.trim(),
         priority,
         category: category.trim(),
-        location,
-        locationCoordinates,
-        attachments,
+        location: location ?? null,
+        locationCoordinates: locationCoordinates ?? null,
+        attachments: Array.isArray(attachments) ? attachments : [],
         createdBy: user ?? 'anonymous',
         createdByEmail: email ?? null,
         createdAt: serverTimestamp(),
         status: 'OPEN',
-      });
+      };
+
+      console.log('Final payload check:', payload);
+
+      if (__DEV__) {
+        await addDoc(collection(firestore, TICKETS_COLLECTION), {
+          test: 'ok',
+          createdAt: serverTimestamp(),
+        });
+      }
+
+      await addDoc(collection(firestore, TICKETS_COLLECTION), payload);
 
       Alert.alert('Success', 'Ticket submitted successfully');
       resetForm();
-    } catch (error) {
-      console.error('Ticket Submit Error:', error);
+    } catch (error: any) {
+      console.error('Firestore error:', {
+        message: error?.message,
+        code: error?.code,
+        stack: error?.stack,
+      });
 
       const maybeFirebaseError = error as { code?: string; message?: string };
       const details = maybeFirebaseError?.code ? `\n(${maybeFirebaseError.code})` : '';
@@ -282,11 +278,11 @@ const TicketCreationScreen = (): React.JSX.Element => {
             <Text style={styles.sectionLabel}>Location</Text>
             <Button
               title={isResolvingLocation ? 'Capturing Location...' : 'Use Current Location'}
-              onPress={handleUseCurrentLocation}
+              onPress={getCurrentLocation}
               variant="secondary"
               disabled={isResolvingLocation}
             />
-            <Text style={styles.sectionValue}>{location}</Text>
+            <Text style={styles.sectionValue}>{location ?? 'No location captured yet'}</Text>
           </View>
 
           <View style={styles.section}>
