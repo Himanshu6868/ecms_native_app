@@ -1,32 +1,19 @@
 import React from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-
 import ActionItem from '../components/ActionItem';
 import Button from '../components/Button';
 import InfoRow from '../components/InfoRow';
-import { AuthStackParamList } from '../navigation/AuthStackNavigator';
-import { logout as firebaseLogout } from '../services/firebase/authService';
+import { logout as supabaseLogout } from '../services/auth/authService';
 import { useAuthStore } from '../store/useAuthStore';
 
-type ProfileNavigationProp = NativeStackNavigationProp<AuthStackParamList>;
-
 const ProfileScreen = (): React.JSX.Element => {
-  const navigation = useNavigation<ProfileNavigationProp>();
   const { user, name, email, role, logout } = useAuthStore();
 
   const handleLogout = async (): Promise<void> => {
     console.log('[AUTH] Logout button pressed');
     try {
-      await firebaseLogout();
+      await supabaseLogout();
       logout();
-
-      console.log('[AUTH] Redirecting to FlowSelection');
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'FlowSelection' }],
-      });
     } catch (error) {
       console.error('[AUTH] Error:', error);
       Alert.alert('Logout failed', 'Unable to logout right now. Please try again.');

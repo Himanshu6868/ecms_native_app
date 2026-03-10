@@ -4,34 +4,40 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AppButton from '../components/AppButton';
 import { AuthStackParamList } from '../navigation/AuthStackNavigator';
+import { storeSelectedRole } from '../services/auth/authService';
+import { useAuthStore } from '../store/useAuthStore';
 
-type Props = NativeStackScreenProps<AuthStackParamList, 'FlowSelection'>;
+type Props = NativeStackScreenProps<AuthStackParamList, 'Landing'>;
 
-const FlowSelectionScreen = ({ navigation }: Props): React.JSX.Element => {
+const LandingScreen = ({ navigation }: Props): React.JSX.Element => {
+  const { setRole } = useAuthStore();
+
+  const handleSelectRole = async (role: 'customer' | 'internal'): Promise<void> => {
+    setRole(role);
+    await storeSelectedRole(role);
+    navigation.navigate('Login', { role });
+  };
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.topBadge}>ECMS AUTH</Text>
       <Text style={styles.title}>Secure access for every workflow</Text>
       <Text style={styles.subtitle}>
-        Enterprise passwordless email-link authentication with separate flows for external users and internal teams.
+        Enterprise passwordless OTP authentication with separate flows for external users and internal teams.
       </Text>
 
       <View style={styles.card}>
         <Text style={styles.cardBadge}>NORMAL FLOW</Text>
         <Text style={styles.cardTitle}>Customer / Agent</Text>
-        <Text style={styles.description}>
-          For self-service customers and external agents creating tickets on behalf of users.
-        </Text>
-        <AppButton title="Continue" onPress={() => navigation.navigate('CustomerLogin')} />
+        <Text style={styles.description}>For self-service customers and external agents creating tickets on behalf of users.</Text>
+        <AppButton title="Customer Login" onPress={() => void handleSelectRole('customer')} />
       </View>
 
       <View style={styles.card}>
         <Text style={styles.cardBadge}>INTERNAL FLOW</Text>
         <Text style={styles.cardTitle}>Internal Team</Text>
-        <Text style={styles.description}>
-          For support, escalation teams, managers, and admins handling operations.
-        </Text>
-        <AppButton title="Continue" onPress={() => navigation.navigate('InternalLogin')} />
+        <Text style={styles.description}>For support, escalation teams, managers, and admins handling operations.</Text>
+        <AppButton title="Internal Login" onPress={() => void handleSelectRole('internal')} />
       </View>
     </ScrollView>
   );
@@ -100,4 +106,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default FlowSelectionScreen;
+export default LandingScreen;

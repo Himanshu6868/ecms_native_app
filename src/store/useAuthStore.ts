@@ -2,16 +2,17 @@ import * as SecureStore from 'expo-secure-store';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-import { AuthUserProfile } from '../services/firebase/authService';
+import type { AuthUserProfile, UserRole } from '../services/auth/authService';
 
 type AuthState = {
   user: string | null;
   name: string | null;
   email: string | null;
-  role: string | null;
+  role: UserRole | null;
   isAuthenticated: boolean;
   loading: boolean;
   setUser: (profile: AuthUserProfile) => void;
+  setRole: (role: UserRole | null) => void;
   setLoading: (loading: boolean) => void;
   logout: () => void;
 };
@@ -44,6 +45,7 @@ export const useAuthStore = create<AuthState>()(
           isAuthenticated: true,
           loading: false,
         }),
+      setRole: (role) => set({ role }),
       setLoading: (loading) => set({ loading }),
       logout: () =>
         set({
