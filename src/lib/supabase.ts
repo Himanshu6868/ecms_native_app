@@ -1,7 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+export const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+export const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase configuration. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.');
@@ -9,13 +9,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 type AuthEvent = 'SIGNED_IN' | 'SIGNED_OUT' | 'TOKEN_REFRESHED';
 
-type SupabaseUser = {
+export type SupabaseUser = {
   id: string;
   email: string | null;
   user_metadata?: Record<string, unknown>;
 };
 
-type SupabaseSession = {
+export type SupabaseSession = {
   access_token: string;
   refresh_token: string;
   user: SupabaseUser;
@@ -80,7 +80,7 @@ class SupabaseAuth {
   signInWithOtp = async ({ email }: { email: string }): Promise<{ error: SupabaseError | null }> => {
     const { error } = await this.request('otp', {
       method: 'POST',
-      body: JSON.stringify({ email, create_user: true }),
+      body: JSON.stringify({ email, create_user: false }),
     });
 
     return { error };
@@ -156,5 +156,3 @@ class SupabaseAuth {
 export const supabase = {
   auth: new SupabaseAuth(),
 };
-
-export type { SupabaseSession, SupabaseUser };

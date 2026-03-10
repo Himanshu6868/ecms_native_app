@@ -7,13 +7,13 @@ import LandingScreen from '../screens/LandingScreen';
 import LoginScreen from '../screens/LoginScreen';
 import CustomerStackNavigator from './CustomerStackNavigator';
 import InternalStackNavigator from './InternalStackNavigator';
-import { buildProfile, getStoredRole, type UserRole } from '../services/auth/authService';
+import { buildProfile, requireAuthorizedUserByEmail } from '../services/auth/authService';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/useAuthStore';
 
 export type AuthStackParamList = {
   Landing: undefined;
-  Login: { role: UserRole };
+  Login: undefined;
   CustomerApp: undefined;
   InternalApp: undefined;
 };
@@ -38,17 +38,23 @@ const AuthStackNavigator = (): React.JSX.Element => {
 
   useEffect(() => {
     const initializeAuth = async (): Promise<void> => {
-      setLoading(true);
-      const [{ data: sessionData }, storedRole] = await Promise.all([supabase.auth.getSession(), getStoredRole()]);
+      try {
+        setLoading(true);
+        const { data: sessionData } = await supabase.auth.getSession();
 
-      if (sessionData.session?.user && storedRole) {
-        setUser(buildProfile(sessionData.session.user, storedRole));
-      } else {
+        if (sessionData.session?.user?.email) {
+          const userRecord = await requireAuthorizedUserByEmail(sessionData.session.user.email);
+          setUser(buildProfile(sessionData.session.user, userRecord));
+        } else {
+          logout();
+        }
+      } catch {
+        await supabase.auth.signOut();
         logout();
+      } finally {
+        setLoading(false);
+        setBootstrapping(false);
       }
-
-      setLoading(false);
-      setBootstrapping(false);
     };
 
     void initializeAuth();
@@ -59,10 +65,13 @@ const AuthStackNavigator = (): React.JSX.Element => {
         return;
       }
 
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        const storedRole = await getStoredRole();
-        if (session?.user && storedRole) {
-          setUser(buildProfile(session.user, storedRole));
+      if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user.email) {
+        try {
+          const userRecord = await requireAuthorizedUserByEmail(session.user.email);
+          setUser(buildProfile(session.user, userRecord));
+        } catch {
+          await supabase.auth.signOut();
+          logout();
         }
       }
     });
@@ -80,20 +89,16 @@ const AuthStackNavigator = (): React.JSX.Element => {
     );
   }
 
+  const initialRoute = isAuthenticated ? (role === 'customer' ? 'CustomerApp' : 'InternalApp') : 'Landing';
+
   return (
     <NavigationContainer theme={appTheme}>
-      <Stack.Navigator
-        initialRouteName={isAuthenticated ? (role === 'internal' ? 'InternalApp' : 'CustomerApp') : 'Landing'}
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: '#030712' },
-        }}
-      >
+      <Stack.Navigator initialRouteName={initialRoute} screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#030712' } }}>
         {isAuthenticated ? (
-          role === 'internal' ? (
-            <Stack.Screen name="InternalApp" component={InternalStackNavigator} />
-          ) : (
+          role === 'customer' ? (
             <Stack.Screen name="CustomerApp" component={CustomerStackNavigator} />
+          ) : (
+            <Stack.Screen name="InternalApp" component={InternalStackNavigator} />
           )
         ) : (
           <>

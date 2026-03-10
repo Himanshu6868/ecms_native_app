@@ -4,40 +4,25 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AppButton from '../components/AppButton';
 import { AuthStackParamList } from '../navigation/AuthStackNavigator';
-import { storeSelectedRole } from '../services/auth/authService';
-import { useAuthStore } from '../store/useAuthStore';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Landing'>;
 
 const LandingScreen = ({ navigation }: Props): React.JSX.Element => {
-  const { setRole } = useAuthStore();
-
-  const handleSelectRole = async (role: 'customer' | 'internal'): Promise<void> => {
-    setRole(role);
-    await storeSelectedRole(role);
-    navigation.navigate('Login', { role });
+  const goToLogin = (): void => {
+    navigation.navigate('Login');
   };
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.topBadge}>ECMS AUTH</Text>
       <Text style={styles.title}>Secure access for every workflow</Text>
-      <Text style={styles.subtitle}>
-        Enterprise passwordless OTP authentication with separate flows for external users and internal teams.
-      </Text>
+      <Text style={styles.subtitle}>Enterprise passwordless OTP authentication with role-based authorization.</Text>
 
       <View style={styles.card}>
-        <Text style={styles.cardBadge}>NORMAL FLOW</Text>
-        <Text style={styles.cardTitle}>Customer / Agent</Text>
-        <Text style={styles.description}>For self-service customers and external agents creating tickets on behalf of users.</Text>
-        <AppButton title="Customer Login" onPress={() => void handleSelectRole('customer')} />
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.cardBadge}>INTERNAL FLOW</Text>
-        <Text style={styles.cardTitle}>Internal Team</Text>
-        <Text style={styles.description}>For support, escalation teams, managers, and admins handling operations.</Text>
-        <AppButton title="Internal Login" onPress={() => void handleSelectRole('internal')} />
+        <Text style={styles.cardBadge}>AUTH FLOW</Text>
+        <Text style={styles.cardTitle}>Continue to Login</Text>
+        <Text style={styles.description}>Use your authorized email to receive an OTP and access your role-based workspace.</Text>
+        <AppButton title="Sign In" onPress={goToLogin} />
       </View>
     </ScrollView>
   );

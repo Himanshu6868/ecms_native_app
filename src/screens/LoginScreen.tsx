@@ -5,21 +5,17 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import AppButton from '../components/AppButton';
 import AppInput from '../components/AppInput';
 import { AuthStackParamList } from '../navigation/AuthStackNavigator';
-import { buildProfile, sendOtp, storeSelectedRole, verifyOtp } from '../services/auth/authService';
+import { buildProfile, requireAuthorizedUserByEmail, sendOtp, verifyOtp } from '../services/auth/authService';
 import { getEmailError } from '../utils/validators';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/useAuthStore';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
-const generateDevOtp = (): string => Math.floor(100000 + Math.random() * 900000).toString();
-
-const LoginScreen = ({ navigation, route }: Props): React.JSX.Element => {
-  const { role } = route.params;
+const LoginScreen = ({ navigation }: Props): React.JSX.Element => {
   const { setUser } = useAuthStore();
   const [email, setEmail] = useState('');
   const [enteredOtp, setEnteredOtp] = useState('');
-  const [generatedOtp, setGeneratedOtp] = useState('');
   const [status, setStatus] = useState<string | null>(null);
   const [statusTone, setStatusTone] = useState<'success' | 'error' | 'info'>('info');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -27,26 +23,15 @@ const LoginScreen = ({ navigation, route }: Props): React.JSX.Element => {
 
   const emailError = useMemo(() => getEmailError(email.trim().toLowerCase()), [email]);
 
-  const navigateToDashboard = (): void => {
-    navigation.replace(role === 'internal' ? 'InternalApp' : 'CustomerApp');
-  };
-
-  const finalizeLogin = async (): Promise<void> => {
-    const normalizedEmail = email.trim().toLowerCase();
+  const finalizeLogin = async (normalizedEmail: string): Promise<void> => {
     const { data } = await supabase.auth.getUser();
 
-    if (data.user) {
-      setUser(buildProfile(data.user, role));
-    } else {
-      setUser({
-        user: `dev-${normalizedEmail}`,
-        email: normalizedEmail,
-        name: normalizedEmail.split('@')[0] || 'User',
-        role,
-      });
+    if (!data.user) {
+      throw new Error('Session not found after OTP verification.');
     }
 
-    navigateToDashboard();
+    const userRecord = await requireAuthorizedUserByEmail(normalizedEmail);
+    setUser(buildProfile(data.user, userRecord));
   };
 
   const handleSendOtp = async (): Promise<void> => {
@@ -58,26 +43,14 @@ const LoginScreen = ({ navigation, route }: Props): React.JSX.Element => {
       return;
     }
 
-    if (role === 'internal' && !normalizedEmail.endsWith('@company.com')) {
-      setStatus('Internal login requires an @company.com email address.');
-      setStatusTone('error');
-      return;
-    }
-
     try {
       setIsRequestingOtp(true);
       setStatus(null);
-      await storeSelectedRole(role);
+
+      await requireAuthorizedUserByEmail(normalizedEmail);
       await sendOtp(normalizedEmail);
 
-      if (__DEV__) {
-        const devOtp = generateDevOtp();
-        setGeneratedOtp(devOtp);
-        setStatus(`OTP generated: ${devOtp}`);
-      } else {
-        setGeneratedOtp('');
-        setStatus('OTP generated: sent');
-      }
+      setStatus('OTP sent successfully. Check your inbox and enter the code below.');
       setStatusTone('success');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to send OTP.';
@@ -93,7 +66,7 @@ const LoginScreen = ({ navigation, route }: Props): React.JSX.Element => {
     const otpValue = enteredOtp.trim();
 
     if (!otpValue) {
-      setStatus('Enter email and OTP.');
+      setStatus('Enter the OTP code to continue.');
       setStatusTone('error');
       return;
     }
@@ -101,21 +74,11 @@ const LoginScreen = ({ navigation, route }: Props): React.JSX.Element => {
     try {
       setIsSubmitting(true);
       setStatus(null);
-      await storeSelectedRole(role);
 
-      if (__DEV__) {
-        if (!generatedOtp || otpValue !== generatedOtp) {
-          setStatus('Invalid or expired OTP. Generate a new OTP and try again.');
-          setStatusTone('error');
-          return;
-        }
-      } else {
-        await verifyOtp(normalizedEmail, otpValue);
-      }
-
+      await verifyOtp(normalizedEmail, otpValue);
+      await finalizeLogin(normalizedEmail);
       setStatus('Signed in successfully. Redirecting...');
       setStatusTone('success');
-      await finalizeLogin();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to verify OTP.';
       setStatus(message);
@@ -128,37 +91,25 @@ const LoginScreen = ({ navigation, route }: Props): React.JSX.Element => {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <TouchableOpacity style={styles.backWrap} onPress={() => navigation.navigate('Landing')}>
-        <Text style={styles.backText}>← Back to role selection</Text>
+        <Text style={styles.backText}>← Back</Text>
       </TouchableOpacity>
 
       <View style={styles.infoCard}>
-        <Text style={styles.badge}>{role === 'customer' ? 'CUSTOMER FLOW' : 'INTERNAL FLOW'}</Text>
-        <Text style={styles.infoTitle}>{role === 'customer' ? 'Customer and agent access' : 'Internal support login'}</Text>
-        <Text style={styles.bullet}>• Passwordless email OTP authentication</Text>
-        <Text style={styles.bullet}>• Secure one-time verification code</Text>
-        <Text style={styles.bullet}>• Session persists across app restarts</Text>
+        <Text style={styles.badge}>SECURE LOGIN</Text>
+        <Text style={styles.infoTitle}>Role-based OTP access</Text>
+        <Text style={styles.bullet}>• Login is allowed only for emails registered in Users table</Text>
+        <Text style={styles.bullet}>• Passwordless one-time passcode verification</Text>
+        <Text style={styles.bullet}>• Role and permissions loaded after sign-in</Text>
       </View>
 
       <View style={styles.formCard}>
-        <Text style={styles.badge}>{role === 'customer' ? 'CUSTOMER LOGIN' : 'INTERNAL LOGIN'}</Text>
+        <Text style={styles.badge}>LOGIN</Text>
         <Text style={styles.formTitle}>Email OTP Sign In</Text>
         <Text style={styles.formSubtitle}>Enter your email to receive a one-time verification code.</Text>
 
-        <AppInput
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          keyboardType="email-address"
-          placeholder={role === 'customer' ? 'you@example.com' : 'team@company.com'}
-        />
+        <AppInput value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" placeholder="you@example.com" />
 
-        <AppInput
-          value={enteredOtp}
-          onChangeText={setEnteredOtp}
-          keyboardType="number-pad"
-          placeholder="6-digit OTP"
-          maxLength={6}
-        />
+        <AppInput value={enteredOtp} onChangeText={setEnteredOtp} keyboardType="number-pad" placeholder="6-digit OTP" maxLength={6} />
 
         <View style={styles.btnGroup}>
           <AppButton
@@ -168,20 +119,22 @@ const LoginScreen = ({ navigation, route }: Props): React.JSX.Element => {
                 void handleSendOtp();
               }
             }}
-            disabled={isRequestingOtp}
           />
           <AppButton
-            title={isSubmitting ? 'Signing in...' : role === 'internal' ? 'Sign In to Internal Portal' : 'Sign In to User Portal'}
+            title={isSubmitting ? 'Verifying...' : 'Login'}
             onPress={() => {
               if (!isSubmitting) {
                 void handleVerifyOtp();
               }
             }}
-            disabled={isSubmitting}
           />
         </View>
 
-        {status ? <Text style={[styles.statusText, statusTone === 'success' ? styles.statusSuccess : styles.statusError]}>{status}</Text> : null}
+        {status ? (
+          <View style={[styles.statusWrap, statusTone === 'success' ? styles.statusSuccess : statusTone === 'error' ? styles.statusError : styles.statusInfo]}>
+            <Text style={styles.statusText}>{status}</Text>
+          </View>
+        ) : null}
       </View>
     </ScrollView>
   );
@@ -190,10 +143,10 @@ const LoginScreen = ({ navigation, route }: Props): React.JSX.Element => {
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
-    paddingHorizontal: 20,
-    paddingTop: 54,
-    paddingBottom: 24,
     backgroundColor: '#030712',
+    paddingHorizontal: 20,
+    paddingTop: 36,
+    paddingBottom: 24,
     gap: 14,
   },
   backWrap: {
@@ -210,7 +163,7 @@ const styles = StyleSheet.create({
     borderColor: '#1F2937',
     borderRadius: 18,
     padding: 18,
-    gap: 10,
+    gap: 8,
   },
   badge: {
     color: '#60A5FA',
@@ -220,13 +173,13 @@ const styles = StyleSheet.create({
   },
   infoTitle: {
     color: '#F9FAFB',
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '700',
   },
   bullet: {
-    color: '#CBD5E1',
-    fontSize: 15,
-    lineHeight: 21,
+    color: '#9CA3AF',
+    fontSize: 14,
+    lineHeight: 20,
   },
   formCard: {
     backgroundColor: '#0B1220',
@@ -234,32 +187,43 @@ const styles = StyleSheet.create({
     borderColor: '#1F2937',
     borderRadius: 18,
     padding: 18,
-    gap: 12,
+    gap: 10,
   },
   formTitle: {
     color: '#F9FAFB',
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '700',
-    marginTop: 6,
   },
   formSubtitle: {
     color: '#9CA3AF',
     fontSize: 14,
-    marginBottom: 4,
+    marginBottom: 8,
   },
   btnGroup: {
-    marginTop: 4,
+    marginTop: 8,
     gap: 10,
   },
+  statusWrap: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 10,
+    marginTop: 6,
+  },
   statusText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
   statusSuccess: {
-    color: '#86EFAC',
+    borderColor: '#065F46',
+    backgroundColor: '#052E2B',
   },
   statusError: {
-    color: '#FCA5A5',
+    borderColor: '#7F1D1D',
+    backgroundColor: '#450A0A',
+  },
+  statusInfo: {
+    borderColor: '#1E3A8A',
+    backgroundColor: '#0B2948',
   },
 });
 

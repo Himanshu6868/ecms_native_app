@@ -1,9 +1,7 @@
 import React from 'react';
 
-import TabNavigator from './TabNavigator';
+import CustomerTabNavigator from './CustomerTabNavigator';
 
-const CustomerStackNavigator = (): React.JSX.Element => {
-  return <TabNavigator />;
-};
+const CustomerStackNavigator = (): React.JSX.Element => <CustomerTabNavigator />;
 
 export default CustomerStackNavigator;
