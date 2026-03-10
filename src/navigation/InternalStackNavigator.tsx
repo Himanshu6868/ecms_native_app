@@ -1,9 +1,7 @@
 import React from 'react';
 
-import TabNavigator from './TabNavigator';
+import AdminTabNavigator from './AdminTabNavigator';
 
-const InternalStackNavigator = (): React.JSX.Element => {
-  return <TabNavigator />;
-};
+const InternalStackNavigator = (): React.JSX.Element => <AdminTabNavigator />;
 
 export default InternalStackNavigator;

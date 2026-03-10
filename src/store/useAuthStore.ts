@@ -9,10 +9,10 @@ type AuthState = {
   name: string | null;
   email: string | null;
   role: UserRole | null;
+  area: string | null;
   isAuthenticated: boolean;
   loading: boolean;
   setUser: (profile: AuthUserProfile) => void;
-  setRole: (role: UserRole | null) => void;
   setLoading: (loading: boolean) => void;
   logout: () => void;
 };
@@ -34,6 +34,7 @@ export const useAuthStore = create<AuthState>()(
       name: null,
       email: null,
       role: null,
+      area: null,
       isAuthenticated: false,
       loading: false,
       setUser: (profile) =>
@@ -42,10 +43,10 @@ export const useAuthStore = create<AuthState>()(
           name: profile.name,
           email: profile.email,
           role: profile.role,
+          area: profile.area,
           isAuthenticated: true,
           loading: false,
         }),
-      setRole: (role) => set({ role }),
       setLoading: (loading) => set({ loading }),
       logout: () =>
         set({
@@ -53,6 +54,7 @@ export const useAuthStore = create<AuthState>()(
           name: null,
           email: null,
           role: null,
+          area: null,
           isAuthenticated: false,
           loading: false,
         }),
@@ -65,8 +67,9 @@ export const useAuthStore = create<AuthState>()(
         name: state.name,
         email: state.email,
         role: state.role,
+        area: state.area,
         isAuthenticated: state.isAuthenticated,
       }),
-    }
-  )
+    },
+  ),
 );

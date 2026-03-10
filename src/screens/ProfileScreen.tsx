@@ -1,6 +1,5 @@
 import React from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
-import ActionItem from '../components/ActionItem';
 import Button from '../components/Button';
 import InfoRow from '../components/InfoRow';
 import { logout as supabaseLogout } from '../services/auth/authService';
@@ -10,12 +9,10 @@ const ProfileScreen = (): React.JSX.Element => {
   const { user, name, email, role, logout } = useAuthStore();
 
   const handleLogout = async (): Promise<void> => {
-    console.log('[AUTH] Logout button pressed');
     try {
       await supabaseLogout();
       logout();
-    } catch (error) {
-      console.error('[AUTH] Error:', error);
+    } catch {
       Alert.alert('Logout failed', 'Unable to logout right now. Please try again.');
     }
   };
@@ -52,14 +49,14 @@ const ProfileScreen = (): React.JSX.Element => {
         </View>
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Account Actions</Text>
-        <View style={styles.actionsWrap}>
-          <ActionItem title="Edit Profile" />
-          <ActionItem title="Notification Settings" />
-          <ActionItem title="Privacy & Security" />
+      {role !== 'customer' ? (
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Account Actions</Text>
+          <View style={styles.actionsWrap}>
+            <Text style={styles.helperText}>Operational access is managed by your role policy.</Text>
+          </View>
         </View>
-      </View>
+      ) : null}
 
       <View style={styles.logoutSection}>
         <Button title="Logout" variant="danger" onPress={() => void handleLogout()} style={styles.logoutButton} />
@@ -149,6 +146,10 @@ const styles = StyleSheet.create({
   },
   actionsWrap: {
     gap: 10,
+  },
+  helperText: {
+    color: '#9CA3AF',
+    fontSize: 14,
   },
   logoutSection: {
     marginTop: 4,

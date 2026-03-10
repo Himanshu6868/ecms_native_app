@@ -1,67 +1,82 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { collection, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 
 import Badge from '../components/Badge';
 import TicketCard, { Ticket } from '../components/TicketCard';
+import { firestore } from '../services/firebase/firebase';
+import { useAuthStore } from '../store/useAuthStore';
 
-const currentUserEmail = 'support.member1.demo@gmail.com';
+const TICKETS_COLLECTION = 'tickets';
 
-const tickets: Ticket[] = [
-  {
-    id: '#f0472021',
-    status: 'CLOSED',
-    priority: 'MEDIUM',
-    assignedTo: 'support.member2.demo@gmail.com',
-  },
-  {
-    id: '#4f13f34b',
-    status: 'ASSIGNED',
-    priority: 'HIGH',
-    assignedTo: 'super.admin1.demo@gmail.com',
-  },
-  {
-    id: '#bc054a70',
-    status: 'OPEN',
-    priority: 'CRITICAL',
-    assignedTo: 'support.member1.demo@gmail.com',
-  },
-  {
-    id: '#aa9123de',
-    status: 'OPEN',
-    priority: 'HIGH',
-    assignedTo: 'support.member1.demo@gmail.com',
-  },
-];
+const normalizeTicket = (id: string, data: Record<string, unknown>): Ticket => ({
+  id: `#${id}`,
+  status: data.status === 'CLOSED' || data.status === 'ASSIGNED' ? data.status : 'OPEN',
+  priority:
+    data.priority === 'LOW' || data.priority === 'MEDIUM' || data.priority === 'HIGH' || data.priority === 'CRITICAL'
+      ? data.priority
+      : 'LOW',
+  assignedTo: typeof data.assignedTo === 'string' && data.assignedTo.trim() ? data.assignedTo : 'Unassigned',
+});
 
 const MyTicketsScreen = (): React.JSX.Element => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { user, role } = useAuthStore();
 
-  const assignedTickets = useMemo(
-    () => tickets.filter((ticket) => ticket.assignedTo === currentUserEmail),
-    [],
-  );
-
-  const filteredTickets = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-
-    if (!query) {
-      return assignedTickets;
+  useEffect(() => {
+    if (!user) {
+      setTickets([]);
+      setIsLoading(false);
+      return;
     }
 
-    return assignedTickets.filter(
-      (ticket) => ticket.id.toLowerCase().includes(query) || ticket.status.toLowerCase().includes(query),
+    const baseRef = collection(firestore, TICKETS_COLLECTION);
+    const ticketsQuery =
+      role === 'customer'
+        ? query(baseRef, where('createdBy', '==', user), orderBy('createdAt', 'desc'))
+        : query(baseRef, orderBy('createdAt', 'desc'));
+
+    const unsubscribe = onSnapshot(
+      ticketsQuery,
+      (snapshot) => {
+        const nextTickets = snapshot.docs.map((docSnapshot) => normalizeTicket(docSnapshot.id, docSnapshot.data()));
+        setTickets(nextTickets);
+        setIsLoading(false);
+      },
+      () => {
+        setTickets([]);
+        setIsLoading(false);
+      },
     );
-  }, [assignedTickets, searchQuery]);
+
+    return unsubscribe;
+  }, [role, user]);
+
+  const filteredTickets = useMemo(() => {
+    const queryText = searchQuery.trim().toLowerCase();
+
+    if (!queryText) {
+      return tickets;
+    }
+
+    return tickets.filter(
+      (ticket) => ticket.id.toLowerCase().includes(queryText) || ticket.status.toLowerCase().includes(queryText),
+    );
+  }, [searchQuery, tickets]);
 
   return (
     <View style={styles.screen}>
       <View style={styles.headerCard}>
         <View>
-          <Text style={styles.title}>My Tickets</Text>
-          <Text style={styles.subtitle}>Tickets currently assigned to you</Text>
+          <Text style={styles.title}>{role === 'customer' ? 'My Tickets' : 'Ticket Management'}</Text>
+          <Text style={styles.subtitle}>
+            {role === 'customer' ? 'Tickets created by your account' : 'Operational visibility across all tickets'}
+          </Text>
         </View>
-        <Badge label="3 Active" variant="active" />
+        <Badge label={`${tickets.length} Total`} variant="active" />
       </View>
 
       <View style={styles.filterCard}>
@@ -75,28 +90,27 @@ const MyTicketsScreen = (): React.JSX.Element => {
             placeholderTextColor="#6B7280"
           />
         </View>
-
-        <View style={styles.chipsWrap}>
-          <Badge label="All" variant="active" />
-          <Badge label="Open" variant="neutral" />
-          <Badge label="High Priority" variant="neutral" />
-          <Badge label="Critical" variant="neutral" />
-        </View>
       </View>
 
-      <FlatList
-        data={filteredTickets}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <TicketCard ticket={item} />}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={
-          <View style={styles.emptyWrap}>
-            <Ionicons name="ticket-outline" size={42} color="#6B7280" />
-            <Text style={styles.emptyText}>No tickets assigned to you</Text>
-          </View>
-        }
-        showsVerticalScrollIndicator={false}
-      />
+      {isLoading ? (
+        <View style={styles.emptyWrap}>
+          <Text style={styles.emptyText}>Loading tickets...</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredTickets}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => <TicketCard ticket={item} />}
+          contentContainerStyle={styles.listContent}
+          ListEmptyComponent={
+            <View style={styles.emptyWrap}>
+              <Ionicons name="ticket-outline" size={42} color="#6B7280" />
+              <Text style={styles.emptyText}>{role === 'customer' ? 'No tickets created by you' : 'No tickets found'}</Text>
+            </View>
+          }
+          showsVerticalScrollIndicator={false}
+        />
+      )}
     </View>
   );
 };
@@ -152,11 +166,6 @@ const styles = StyleSheet.create({
     color: '#E5E7EB',
     fontSize: 13,
     paddingVertical: 10,
-  },
-  chipsWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
   },
   listContent: {
     gap: 10,

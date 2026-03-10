@@ -7,6 +7,7 @@ import ActionButton from '../components/ActionButton';
 import Badge from '../components/Badge';
 import StatCard from '../components/StatCard';
 import { firestore } from '../services/firebase/firebase';
+import { useAuthStore } from '../store/useAuthStore';
 
 type TicketStatus = 'OPEN' | 'CLOSED' | 'ASSIGNED';
 type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
@@ -37,6 +38,7 @@ const normalizePriority = (priority: unknown): TicketPriority => {
 };
 
 const DashboardScreen = (): React.JSX.Element => {
+  const { role } = useAuthStore();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -61,8 +63,7 @@ const DashboardScreen = (): React.JSX.Element => {
         setTickets(nextTickets);
         setIsLoading(false);
       },
-      (error) => {
-        console.error('Failed to fetch dashboard tickets:', error);
+      () => {
         setTickets([]);
         setIsLoading(false);
       },
@@ -113,7 +114,7 @@ const DashboardScreen = (): React.JSX.Element => {
         <View style={styles.headerTextWrap}>
           <Text style={styles.appTitle}>ECMS Console</Text>
           <Text style={styles.subtitle}>Enterprise Case Management</Text>
-          <Text style={styles.roleLabel}>Role: ADMIN</Text>
+          <Text style={styles.roleLabel}>Role: {(role ?? 'internal').toUpperCase()}</Text>
         </View>
         <View style={styles.liveQueueBadge}>
           <Text style={styles.liveQueueText}>Live queue: last 20 tickets</Text>
