@@ -5,19 +5,47 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import AppButton from '../components/AppButton';
 import AppInput from '../components/AppInput';
 import { AuthStackParamList } from '../navigation/AuthStackNavigator';
-import { sendOtp, storeSelectedRole, verifyOtp } from '../services/auth/authService';
+import { buildProfile, sendOtp, storeSelectedRole, verifyOtp } from '../services/auth/authService';
 import { getEmailError } from '../utils/validators';
+import { supabase } from '../lib/supabase';
+import { useAuthStore } from '../store/useAuthStore';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
+const generateDevOtp = (): string => Math.floor(100000 + Math.random() * 900000).toString();
+
 const LoginScreen = ({ navigation, route }: Props): React.JSX.Element => {
   const { role } = route.params;
+  const { setUser } = useAuthStore();
   const [email, setEmail] = useState('');
-  const [otp, setOtp] = useState('');
+  const [enteredOtp, setEnteredOtp] = useState('');
+  const [generatedOtp, setGeneratedOtp] = useState('');
   const [otpSent, setOtpSent] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const emailError = useMemo(() => getEmailError(email.trim().toLowerCase()), [email]);
+
+  const navigateToDashboard = (): void => {
+    navigation.replace(role === 'internal' ? 'InternalApp' : 'CustomerApp');
+  };
+
+  const finalizeLogin = async (): Promise<void> => {
+    const normalizedEmail = email.trim().toLowerCase();
+    const { data } = await supabase.auth.getUser();
+
+    if (data.user) {
+      setUser(buildProfile(data.user, role));
+    } else {
+      setUser({
+        user: `dev-${normalizedEmail}`,
+        email: normalizedEmail,
+        name: normalizedEmail.split('@')[0] || 'User',
+        role,
+      });
+    }
+
+    navigateToDashboard();
+  };
 
   const handleSendOtp = async (): Promise<void> => {
     const normalizedEmail = email.trim().toLowerCase();
@@ -33,35 +61,54 @@ const LoginScreen = ({ navigation, route }: Props): React.JSX.Element => {
     }
 
     try {
-      setBusy(true);
+      setLoading(true);
       await storeSelectedRole(role);
       await sendOtp(normalizedEmail);
       setOtpSent(true);
-      Alert.alert('OTP sent', 'Please check your email for the verification code.');
+      setEnteredOtp('');
+
+      if (__DEV__) {
+        setGeneratedOtp(generateDevOtp());
+      } else {
+        setGeneratedOtp('');
+      }
+
+      Alert.alert('OTP sent', __DEV__ ? 'Use the DEV OTP shown below to continue.' : 'Please check your email for the verification code.');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to send OTP.';
       Alert.alert('OTP error', message);
     } finally {
-      setBusy(false);
+      setLoading(false);
     }
   };
 
   const handleVerifyOtp = async (): Promise<void> => {
     const normalizedEmail = email.trim().toLowerCase();
+    const otpValue = enteredOtp.trim();
 
-    if (!otp.trim()) {
+    if (!otpValue) {
       Alert.alert('Missing OTP', 'Please enter the OTP sent to your email.');
       return;
     }
 
     try {
-      setBusy(true);
-      await verifyOtp(normalizedEmail, otp.trim());
+      setLoading(true);
+
+      if (__DEV__) {
+        if (!generatedOtp || otpValue !== generatedOtp) {
+          Alert.alert('Verification failed', 'Invalid OTP. Please enter the DEV OTP shown on screen.');
+          return;
+        }
+      } else {
+        await verifyOtp(normalizedEmail, otpValue);
+      }
+
+      await finalizeLogin();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to verify OTP.';
       Alert.alert('Verification failed', message);
     } finally {
-      setBusy(false);
+      setLoading(false);
     }
   };
 
@@ -93,32 +140,37 @@ const LoginScreen = ({ navigation, route }: Props): React.JSX.Element => {
         />
 
         {otpSent ? (
-          <AppInput
-            value={otp}
-            onChangeText={setOtp}
-            keyboardType="number-pad"
-            placeholder="Enter OTP"
-          />
+          <>
+            <AppInput
+              value={enteredOtp}
+              onChangeText={setEnteredOtp}
+              keyboardType="number-pad"
+              placeholder="Enter OTP"
+            />
+            {__DEV__ && generatedOtp ? <Text style={styles.devOtpText}>DEV OTP: {generatedOtp}</Text> : null}
+          </>
         ) : null}
 
         <View style={styles.btnGroup}>
           {otpSent ? (
             <AppButton
-              title={busy ? 'Verifying...' : 'Verify OTP'}
+              title={loading ? 'Verifying...' : 'Verify OTP'}
               onPress={() => {
-                if (!busy) {
+                if (!loading) {
                   void handleVerifyOtp();
                 }
               }}
+              disabled={loading}
             />
           ) : (
             <AppButton
-              title={busy ? 'Sending...' : 'Send OTP'}
+              title={loading ? 'Sending...' : 'Send OTP'}
               onPress={() => {
-                if (!busy) {
+                if (!loading) {
                   void handleSendOtp();
                 }
               }}
+              disabled={loading}
             />
           )}
         </View>
@@ -190,6 +242,11 @@ const styles = StyleSheet.create({
   btnGroup: {
     marginTop: 4,
     gap: 10,
+  },
+  devOtpText: {
+    color: '#FDE68A',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
 

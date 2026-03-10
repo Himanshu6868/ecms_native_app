@@ -5,17 +5,19 @@ type AppButtonProps = {
   title: string;
   onPress: () => void;
   variant?: 'primary' | 'secondary';
+  disabled?: boolean;
 };
 
-const AppButton = ({ title, onPress, variant = 'primary' }: AppButtonProps): React.JSX.Element => {
+const AppButton = ({ title, onPress, variant = 'primary', disabled = false }: AppButtonProps): React.JSX.Element => {
   return (
     <Pressable
       style={({ pressed }) => [
         styles.button,
         variant === 'secondary' ? styles.secondaryButton : styles.primaryButton,
-        pressed && styles.pressed,
+        disabled ? styles.disabled : pressed && styles.pressed,
       ]}
       onPress={onPress}
+      disabled={disabled}
     >
       <Text style={styles.buttonText}>{title}</Text>
     </Pressable>
@@ -43,6 +45,9 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.85,
+  },
+  disabled: {
+    opacity: 0.5,
   },
 });
 
