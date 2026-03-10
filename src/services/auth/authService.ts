@@ -82,7 +82,7 @@ export const verifyOtp = async (email: string, token: string): Promise<SupabaseS
 export const getUserByEmail = async (email: string): Promise<UserRecord | null> => {
   const normalizedEmail = email.trim().toLowerCase();
   const rows = await requestUsers<Record<string, unknown>[]>(
-    `users?select=id,name,email,role,area&email=eq.${encodeURIComponent(normalizedEmail)}&limit=1`,
+    `users?select=id,name,email,role&email=eq.${encodeURIComponent(normalizedEmail)}&limit=1`,
   );
 
   if (rows.length === 0) {
@@ -116,7 +116,7 @@ export const createUser = async (payload: {
   role: UserRole;
   area?: string;
 }): Promise<UserRecord> => {
-  const rows = await requestUsers<Record<string, unknown>[]>('users?select=id,name,email,role,area', {
+  const rows = await requestUsers<Record<string, unknown>[]>('users?select=id,name,email,role', {
     method: 'POST',
     headers: {
       Prefer: 'return=representation',
@@ -125,7 +125,6 @@ export const createUser = async (payload: {
       name: payload.name,
       email: payload.email.toLowerCase(),
       role: payload.role,
-      area: payload.area?.trim() ? payload.area.trim() : null,
     }),
   });
 
