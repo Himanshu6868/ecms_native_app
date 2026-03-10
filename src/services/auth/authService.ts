@@ -58,9 +58,18 @@ const mapUserRecord = (row: Record<string, unknown>): UserRecord => {
 };
 
 export const sendOtp = async (email: string): Promise<void> => {
-  const { error } = await supabase.auth.signInWithOtp({ email });
+  const { error } = await supabase.auth.signInWithOtp({
+    email,
+    options: {
+      shouldCreateUser: false,
+    },
+  });
 
   if (error) {
+    if (error.message.toLowerCase().includes('signups not allowed')) {
+      throw new Error('Login denied. This email is not authorized.');
+    }
+
     throw new Error(error.message);
   }
 };
