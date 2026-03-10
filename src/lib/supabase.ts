@@ -86,7 +86,14 @@ class SupabaseAuth {
     return { error };
   };
 
-  verifyOtp = async ({ email, token }: { email: string; token: string }): Promise<{ data: { session: SupabaseSession | null }; error: SupabaseError | null }> => {
+  verifyOtp = async ({
+    email,
+    token,
+  }: {
+    email: string;
+    token: string;
+    type?: 'email';
+  }): Promise<{ data: { session: SupabaseSession | null }; error: SupabaseError | null }> => {
     const { data, error } = await this.request<SupabaseSession>('verify', {
       method: 'POST',
       body: JSON.stringify({ email, token, type: 'email' }),
@@ -124,6 +131,11 @@ class SupabaseAuth {
   getSession = async (): Promise<{ data: { session: SupabaseSession | null } }> => {
     await this.hydrateSession();
     return { data: { session: this.session } };
+  };
+
+  getUser = async (): Promise<{ data: { user: SupabaseUser | null } }> => {
+    await this.hydrateSession();
+    return { data: { user: this.session?.user ?? null } };
   };
 
   onAuthStateChange = (callback: AuthStateCallback): { data: { subscription: { unsubscribe: () => void } } } => {
