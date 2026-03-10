@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AppButton from '../components/AppButton';
@@ -20,8 +20,10 @@ const LoginScreen = ({ navigation, route }: Props): React.JSX.Element => {
   const [email, setEmail] = useState('');
   const [enteredOtp, setEnteredOtp] = useState('');
   const [generatedOtp, setGeneratedOtp] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
+  const [statusTone, setStatusTone] = useState<'success' | 'error' | 'info'>('info');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRequestingOtp, setIsRequestingOtp] = useState(false);
 
   const emailError = useMemo(() => getEmailError(email.trim().toLowerCase()), [email]);
 
@@ -51,34 +53,38 @@ const LoginScreen = ({ navigation, route }: Props): React.JSX.Element => {
     const normalizedEmail = email.trim().toLowerCase();
 
     if (emailError) {
-      Alert.alert('Invalid email', emailError);
+      setStatus(emailError);
+      setStatusTone('error');
       return;
     }
 
     if (role === 'internal' && !normalizedEmail.endsWith('@company.com')) {
-      Alert.alert('Invalid company email', 'Internal login requires an @company.com email address.');
+      setStatus('Internal login requires an @company.com email address.');
+      setStatusTone('error');
       return;
     }
 
     try {
-      setLoading(true);
+      setIsRequestingOtp(true);
+      setStatus(null);
       await storeSelectedRole(role);
       await sendOtp(normalizedEmail);
-      setOtpSent(true);
-      setEnteredOtp('');
 
       if (__DEV__) {
-        setGeneratedOtp(generateDevOtp());
+        const devOtp = generateDevOtp();
+        setGeneratedOtp(devOtp);
+        setStatus(`OTP generated: ${devOtp}`);
       } else {
         setGeneratedOtp('');
+        setStatus('OTP generated: sent');
       }
-
-      Alert.alert('OTP sent', __DEV__ ? 'Use the DEV OTP shown below to continue.' : 'Please check your email for the verification code.');
+      setStatusTone('success');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to send OTP.';
-      Alert.alert('OTP error', message);
+      setStatus(message);
+      setStatusTone('error');
     } finally {
-      setLoading(false);
+      setIsRequestingOtp(false);
     }
   };
 
@@ -87,28 +93,35 @@ const LoginScreen = ({ navigation, route }: Props): React.JSX.Element => {
     const otpValue = enteredOtp.trim();
 
     if (!otpValue) {
-      Alert.alert('Missing OTP', 'Please enter the OTP sent to your email.');
+      setStatus('Enter email and OTP.');
+      setStatusTone('error');
       return;
     }
 
     try {
-      setLoading(true);
+      setIsSubmitting(true);
+      setStatus(null);
+      await storeSelectedRole(role);
 
       if (__DEV__) {
         if (!generatedOtp || otpValue !== generatedOtp) {
-          Alert.alert('Verification failed', 'Invalid OTP. Please enter the DEV OTP shown on screen.');
+          setStatus('Invalid or expired OTP. Generate a new OTP and try again.');
+          setStatusTone('error');
           return;
         }
       } else {
         await verifyOtp(normalizedEmail, otpValue);
       }
 
+      setStatus('Signed in successfully. Redirecting...');
+      setStatusTone('success');
       await finalizeLogin();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to verify OTP.';
-      Alert.alert('Verification failed', message);
+      setStatus(message);
+      setStatusTone('error');
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -139,41 +152,36 @@ const LoginScreen = ({ navigation, route }: Props): React.JSX.Element => {
           placeholder={role === 'customer' ? 'you@example.com' : 'team@company.com'}
         />
 
-        {otpSent ? (
-          <>
-            <AppInput
-              value={enteredOtp}
-              onChangeText={setEnteredOtp}
-              keyboardType="number-pad"
-              placeholder="Enter OTP"
-            />
-            {__DEV__ && generatedOtp ? <Text style={styles.devOtpText}>DEV OTP: {generatedOtp}</Text> : null}
-          </>
-        ) : null}
+        <AppInput
+          value={enteredOtp}
+          onChangeText={setEnteredOtp}
+          keyboardType="number-pad"
+          placeholder="6-digit OTP"
+          maxLength={6}
+        />
 
         <View style={styles.btnGroup}>
-          {otpSent ? (
-            <AppButton
-              title={loading ? 'Verifying...' : 'Verify OTP'}
-              onPress={() => {
-                if (!loading) {
-                  void handleVerifyOtp();
-                }
-              }}
-              disabled={loading}
-            />
-          ) : (
-            <AppButton
-              title={loading ? 'Sending...' : 'Send OTP'}
-              onPress={() => {
-                if (!loading) {
-                  void handleSendOtp();
-                }
-              }}
-              disabled={loading}
-            />
-          )}
+          <AppButton
+            title={isRequestingOtp ? 'Generating...' : 'Generate OTP'}
+            onPress={() => {
+              if (!isRequestingOtp) {
+                void handleSendOtp();
+              }
+            }}
+            disabled={isRequestingOtp}
+          />
+          <AppButton
+            title={isSubmitting ? 'Signing in...' : role === 'internal' ? 'Sign In to Internal Portal' : 'Sign In to User Portal'}
+            onPress={() => {
+              if (!isSubmitting) {
+                void handleVerifyOtp();
+              }
+            }}
+            disabled={isSubmitting}
+          />
         </View>
+
+        {status ? <Text style={[styles.statusText, statusTone === 'success' ? styles.statusSuccess : styles.statusError]}>{status}</Text> : null}
       </View>
     </ScrollView>
   );
@@ -243,10 +251,15 @@ const styles = StyleSheet.create({
     marginTop: 4,
     gap: 10,
   },
-  devOtpText: {
-    color: '#FDE68A',
+  statusText: {
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '600',
+  },
+  statusSuccess: {
+    color: '#86EFAC',
+  },
+  statusError: {
+    color: '#FCA5A5',
   },
 });
 
