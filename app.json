@@ -39,7 +39,7 @@
           "data": [
             {
               "scheme": "https",
-              "host": "yourapp.page.link"
+              "host": "ecmsapp.page.link"
             }
           ],
           "category": [
@@ -48,7 +48,7 @@
           ]
         }
       ],
-      "package": "com.yourcompany.yourapp"
+      "package": "com.yourcompany.ecms"
     },
     "web": {
       "output": "static",

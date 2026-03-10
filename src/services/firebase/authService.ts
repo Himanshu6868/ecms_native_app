@@ -12,8 +12,9 @@ import { doc, getDoc } from 'firebase/firestore';
 import { auth, firestore } from './firebase';
 
 const EMAIL_STORAGE_KEY = 'auth_email_for_signin';
-const DEFAULT_DYNAMIC_LINK_DOMAIN = 'yourapp.page.link';
-const DEFAULT_ANDROID_PACKAGE = 'com.yourcompany.yourapp';
+const DEFAULT_DYNAMIC_LINK_DOMAIN = 'ecmsapp.page.link';
+const DEFAULT_ANDROID_PACKAGE = 'com.yourcompany.ecms';
+const DEFAULT_CONTINUE_PATH = 'finishSignIn';
 
 export type AuthUserProfile = {
   user: string;
@@ -43,36 +44,32 @@ const mapAuthErrorMessage = (error: unknown): string => {
   }
 };
 
-const getAuthorizedAuthDomain = (): string | null => {
-  const authDomain = process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN;
-  return authDomain ? `https://${authDomain}` : null;
-};
-
 const getConfiguredDynamicLinkDomain = (): string | null => {
   const configuredDomain = process.env.EXPO_PUBLIC_FIREBASE_DYNAMIC_LINK_DOMAIN;
-  return configuredDomain && configuredDomain !== DEFAULT_DYNAMIC_LINK_DOMAIN ? configuredDomain : null;
+  return configuredDomain || DEFAULT_DYNAMIC_LINK_DOMAIN;
+};
+
+const normalizeContinueUrl = (url: string): string => {
+  if (url.includes('localhost')) {
+    throw new Error('EXPO_PUBLIC_FIREBASE_CONTINUE_URL must not use localhost for Android email-link sign-in.');
+  }
+
+  return url;
 };
 
 const buildEmailLinkUrl = (): string => {
   const explicitContinueUrl = process.env.EXPO_PUBLIC_FIREBASE_CONTINUE_URL;
 
   if (explicitContinueUrl) {
-    return explicitContinueUrl;
-  }
-
-  const authDomainUrl = getAuthorizedAuthDomain();
-  if (authDomainUrl) {
-    // Firebase always serves this endpoint, even when Hosting is not configured.
-    // Using /auth-complete requires a deployed Hosting site and can 404.
-    return `${authDomainUrl}/__/auth/action`;
+    return normalizeContinueUrl(explicitContinueUrl);
   }
 
   const dynamicLinkDomain = getConfiguredDynamicLinkDomain();
   if (dynamicLinkDomain) {
-    return `https://${dynamicLinkDomain}/auth-complete`;
+    return `https://${dynamicLinkDomain}/${DEFAULT_CONTINUE_PATH}`;
   }
 
-  throw new Error('Firebase email-link login is missing configuration. Set EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN or EXPO_PUBLIC_FIREBASE_CONTINUE_URL.');
+  throw new Error('Firebase email-link login is missing configuration. Set EXPO_PUBLIC_FIREBASE_DYNAMIC_LINK_DOMAIN or EXPO_PUBLIC_FIREBASE_CONTINUE_URL.');
 };
 
 const shouldAttachDynamicLinkDomain = (): boolean => {
