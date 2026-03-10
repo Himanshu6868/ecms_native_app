@@ -58,6 +58,7 @@ export const verifyOtp = async (email: string, token: string): Promise<SupabaseS
   const { data, error } = await supabase.auth.verifyOtp({
     email,
     token,
+    type: 'email',
   });
 
   if (error || !data.session) {
