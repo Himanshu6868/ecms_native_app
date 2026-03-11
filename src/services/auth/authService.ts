@@ -65,6 +65,19 @@ const mapUserRecord = (row: Record<string, unknown>): UserRecord => {
   };
 };
 
+const getSessionOrThrow = async (): Promise<SupabaseSession> => {
+  const {
+    data: { session },
+    error,
+  } = await supabase.auth.getSession();
+
+  if (error || !session) {
+    throw new Error('Session not ready');
+  }
+
+  return session;
+};
+
 export const sendOtp = async (email: string): Promise<void> => {
   const { error } = await supabase.auth.signInWithOtp({
     email,
@@ -123,6 +136,28 @@ export const buildProfile = (user: SupabaseUser, userRecord: UserRecord): AuthUs
   name: userRecord.name,
   role: userRecord.role,
 });
+
+export const resolveAuthorizedProfile = async (): Promise<AuthUserProfile> => {
+  const session = await getSessionOrThrow();
+  const email = session.user.email?.trim().toLowerCase();
+
+  if (!email) {
+    throw new Error('User not authorized');
+  }
+
+  // NOTE: Supabase RLS must allow authenticated users to SELECT from public.users.
+  const { data: user, error } = await supabase
+    .from<Record<string, unknown>>('users')
+    .select('*')
+    .ilike('email', email)
+    .single();
+
+  if (error || !user) {
+    throw new Error('User not authorized');
+  }
+
+  return buildProfile(session.user, mapUserRecord(user));
+};
 
 export const listReportingManagers = async (): Promise<Array<{ id: string; name: string; email: string }>> => {
   const rows = await requestUsers<Record<string, unknown>[]>(
