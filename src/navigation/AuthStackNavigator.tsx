@@ -9,7 +9,7 @@ import CustomerStackNavigator from './CustomerStackNavigator';
 import AdminTabNavigator from './AdminTabNavigator';
 import SuperAdminTabNavigator from './SuperAdminTabNavigator';
 import SupportTabNavigator from './SupportTabNavigator';
-import { logout as performLogout, resolveAuthorizedProfile } from '../services/auth/authService';
+import { resolveAuthorizedProfile } from '../services/auth/authService';
 import { useAuthStore } from '../store/useAuthStore';
 
 export type AuthStackParamList = {
@@ -44,9 +44,13 @@ const AuthStackNavigator = (): React.JSX.Element => {
       try {
         setLoading(true);
         const profile = await resolveAuthorizedProfile();
-        setAuthState(profile);
+
+        if (profile) {
+          setAuthState(profile);
+        } else {
+          logout();
+        }
       } catch {
-        await performLogout();
         logout();
       } finally {
         setLoading(false);

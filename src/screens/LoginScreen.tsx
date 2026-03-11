@@ -15,7 +15,6 @@ const LoginScreen = ({ navigation }: Props): React.JSX.Element => {
   const { setAuthState } = useAuthStore();
   const [email, setEmail] = useState('');
   const [enteredOtp, setEnteredOtp] = useState('');
-  const [generatedOtp, setGeneratedOtp] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [statusTone, setStatusTone] = useState<'success' | 'error' | 'info'>('info');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -34,13 +33,11 @@ const LoginScreen = ({ navigation }: Props): React.JSX.Element => {
     try {
       setIsRequestingOtp(true);
       setStatus(null);
-      const otpData = await sendOtp(normalizedEmail);
-      setGeneratedOtp(otpData.otp);
-      setStatus('OTP generated. Enter the OTP shown below to continue.');
+      await sendOtp(normalizedEmail);
+      setStatus('OTP sent to your email. Enter the code to continue.');
       setStatusTone('success');
     } catch (error) {
-      setGeneratedOtp(null);
-      const message = error instanceof Error ? error.message : 'Unable to generate OTP.';
+      const message = error instanceof Error ? error.message : 'Unable to send OTP.';
       setStatus(message);
       setStatusTone('error');
     } finally {
@@ -67,7 +64,7 @@ const LoginScreen = ({ navigation }: Props): React.JSX.Element => {
       setStatusTone('success');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to verify OTP.';
-      setStatus(message === 'User not authorized' ? 'User not authorized' : message);
+      setStatus(message);
       setStatusTone('error');
     } finally {
       setIsSubmitting(false);
@@ -87,44 +84,32 @@ const LoginScreen = ({ navigation }: Props): React.JSX.Element => {
 
       <View style={styles.infoCard}>
         <Text style={styles.badge}>SECURE LOGIN</Text>
-        <Text style={styles.infoTitle}>Role-based OTP access</Text>
-        <Text style={styles.bullet}>• Login is allowed only for emails registered in Users table</Text>
-        <Text style={styles.bullet}>• OTP is generated and displayed inside the app</Text>
-        <Text style={styles.bullet}>• Role and permissions loaded after sign-in</Text>
+        <Text style={styles.infoTitle}>Supabase Email OTP access</Text>
+        <Text style={styles.bullet}>• Enter your email to receive a one-time passcode</Text>
+        <Text style={styles.bullet}>• Verify OTP to create/restore your Supabase session</Text>
+        <Text style={styles.bullet}>• Role and permissions are loaded from your profile</Text>
       </View>
 
       <View style={styles.formCard}>
-        <Text style={styles.formTitle}>Sign in with your work email</Text>
-        <Text style={styles.formSubtitle}>Enter the registered email to generate and verify your OTP.</Text>
+        <Text style={styles.formTitle}>Sign in with your email</Text>
+        <Text style={styles.formSubtitle}>Use the OTP sent by Supabase to complete login.</Text>
 
         <AppInput
-          label="Email"
           value={email}
           onChangeText={(value) => {
             setEmail(value);
             setEnteredOtp('');
-            setGeneratedOtp(null);
           }}
           placeholder="you@company.com"
           keyboardType="email-address"
           autoCapitalize="none"
           autoCorrect={false}
           textContentType="emailAddress"
-          error={emailError ?? undefined}
         />
 
-        <AppButton title={isRequestingOtp ? 'Generating OTP...' : 'Generate OTP'} onPress={() => void handleSendOtp()} disabled={isRequestingOtp} />
-
-        {generatedOtp ? (
-          <View style={styles.otpCard}>
-            <Text style={styles.otpLabel}>App Generated OTP</Text>
-            <Text style={styles.otpValue}>{generatedOtp}</Text>
-            <Text style={styles.otpNote}>Valid for 5 minutes. Max 5 attempts.</Text>
-          </View>
-        ) : null}
+        <AppButton title={isRequestingOtp ? 'Sending OTP...' : 'Send OTP'} onPress={() => void handleSendOtp()} disabled={isRequestingOtp} />
 
         <AppInput
-          label="Enter OTP"
           value={enteredOtp}
           onChangeText={setEnteredOtp}
           placeholder="6-digit code"
@@ -136,6 +121,7 @@ const LoginScreen = ({ navigation }: Props): React.JSX.Element => {
 
         <AppButton title={isSubmitting ? 'Verifying...' : 'Verify OTP'} onPress={() => void handleVerifyOtp()} disabled={isSubmitting} />
 
+        {emailError ? <Text style={[styles.statusText, styles.statusError]}>{emailError}</Text> : null}
         {status ? (
           <Text style={[styles.statusText, statusTone === 'error' ? styles.statusError : statusTone === 'success' ? styles.statusSuccess : styles.statusInfo]}>
             {status}

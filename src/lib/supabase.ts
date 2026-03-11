@@ -9,31 +9,19 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 type AuthEvent = 'SIGNED_IN' | 'SIGNED_OUT' | 'TOKEN_REFRESHED';
 
-export type SupabaseUser = {
-  id: string;
-  email: string | null;
-  user_metadata?: Record<string, unknown>;
-};
-
-export type SupabaseSession = {
-  access_token: string;
-  refresh_token: string;
-  user: SupabaseUser;
-};
-
 type SupabaseError = {
   message: string;
 };
 
-type PostgrestFilter = {
-  column: string;
-  operator: 'ilike';
-  value: string;
+type SupabaseUser = {
+  id: string;
+  email: string | null;
 };
 
-type PostgrestSingleResponse<T> = {
-  data: T | null;
-  error: SupabaseError | null;
+type SupabaseSession = {
+  access_token: string;
+  refresh_token: string;
+  user: SupabaseUser;
 };
 
 type AuthStateCallback = (event: AuthEvent, session: SupabaseSession | null) => void;
@@ -99,7 +87,7 @@ class SupabaseAuth {
   }): Promise<{ error: SupabaseError | null }> => {
     const { error } = await this.request('otp', {
       method: 'POST',
-      body: JSON.stringify({ email, create_user: options?.shouldCreateUser ?? false }),
+      body: JSON.stringify({ email, create_user: options?.shouldCreateUser ?? true }),
     });
 
     return { error };
@@ -152,9 +140,9 @@ class SupabaseAuth {
     return { data: { session: this.session }, error: null };
   };
 
-  getUser = async (): Promise<{ data: { user: SupabaseUser | null } }> => {
+  getUser = async (): Promise<{ data: { user: SupabaseUser | null }; error: SupabaseError | null }> => {
     await this.hydrateSession();
-    return { data: { user: this.session?.user ?? null } };
+    return { data: { user: this.session?.user ?? null }, error: null };
   };
 
   onAuthStateChange = (callback: AuthStateCallback): { data: { subscription: { unsubscribe: () => void } } } => {
@@ -172,10 +160,17 @@ class SupabaseAuth {
   };
 }
 
-class SupabaseQueryBuilder<T extends Record<string, unknown>> {
+type Filter = { column: string; operator: 'eq'; value: string };
+type Sort = { column: string; ascending: boolean };
+
+class SupabaseQueryBuilder {
   private selectColumns = '*';
 
-  private filters: PostgrestFilter[] = [];
+  private filters: Filter[] = [];
+
+  private sort: Sort | null = null;
+
+  private updatePayload: Record<string, unknown> | null = null;
 
   constructor(
     private readonly table: string,
@@ -187,18 +182,32 @@ class SupabaseQueryBuilder<T extends Record<string, unknown>> {
     return this;
   };
 
-  ilike = (column: string, value: string): this => {
-    this.filters.push({ column, operator: 'ilike', value });
+  eq = (column: string, value: string): this => {
+    this.filters.push({ column, operator: 'eq', value });
     return this;
   };
 
-  single = async (): Promise<PostgrestSingleResponse<T>> => {
+  order = (column: string, options?: { ascending?: boolean }): this => {
+    this.sort = { column, ascending: options?.ascending ?? true };
+    return this;
+  };
+
+  update = (payload: Record<string, unknown>): this => {
+    this.updatePayload = payload;
+    return this;
+  };
+
+  private async request(method: 'GET' | 'PATCH'): Promise<{ data: Record<string, unknown>[] | null; error: SupabaseError | null }> {
     const params = new URLSearchParams();
     params.set('select', this.selectColumns);
+
     this.filters.forEach((filter) => {
       params.set(filter.column, `${filter.operator}.${filter.value}`);
     });
-    params.set('limit', '1');
+
+    if (this.sort) {
+      params.set('order', `${this.sort.column}.${this.sort.ascending ? 'asc' : 'desc'}`);
+    }
 
     const { data: sessionData } = await this.auth.getSession();
     if (!sessionData.session) {
@@ -207,12 +216,14 @@ class SupabaseQueryBuilder<T extends Record<string, unknown>> {
 
     try {
       const response = await fetch(`${supabaseUrl}/rest/v1/${this.table}?${params.toString()}`, {
-        method: 'GET',
+        method,
         headers: {
           apikey: supabaseAnonKey,
           Authorization: `Bearer ${sessionData.session.access_token}`,
           'Content-Type': 'application/json',
+          Prefer: method === 'PATCH' ? 'return=representation' : '',
         },
+        body: method === 'PATCH' ? JSON.stringify(this.updatePayload ?? {}) : undefined,
       });
 
       if (!response.ok) {
@@ -220,16 +231,32 @@ class SupabaseQueryBuilder<T extends Record<string, unknown>> {
         return { data: null, error: { message: message || 'Failed to query table.' } };
       }
 
-      const rows = (await response.json()) as T[];
-
-      return { data: rows[0] ?? null, error: null };
+      const rows = (await response.json()) as Record<string, unknown>[];
+      return { data: rows, error: null };
     } catch {
       return { data: null, error: { message: 'Network error. Please try again.' } };
     }
+  }
+
+  single = async <T extends Record<string, unknown>>(): Promise<{ data: T | null; error: SupabaseError | null }> => {
+    const result = await this.request('GET');
+    return { data: (result.data?.[0] as T | undefined) ?? null, error: result.error };
+  };
+
+  get = async <T extends Record<string, unknown>>(): Promise<{ data: T[] | null; error: SupabaseError | null }> => {
+    const result = await this.request('GET');
+    return { data: (result.data as T[] | null) ?? [], error: result.error };
+  };
+
+  execute = async <T extends Record<string, unknown>>(): Promise<{ data: T[] | null; error: SupabaseError | null }> => {
+    const result = await this.request('PATCH');
+    return { data: (result.data as T[] | null) ?? [], error: result.error };
   };
 }
 
+const auth = new SupabaseAuth();
+
 export const supabase = {
-  auth: new SupabaseAuth(),
-  from: <T extends Record<string, unknown>>(table: string): SupabaseQueryBuilder<T> => new SupabaseQueryBuilder(table, supabase.auth),
+  auth,
+  from: (table: string): SupabaseQueryBuilder => new SupabaseQueryBuilder(table, auth),
 };

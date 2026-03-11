@@ -8,6 +8,7 @@ import Badge from '../components/Badge';
 import StatCard from '../components/StatCard';
 import { firestore } from '../services/firebase/firebase';
 import { useAuthStore } from '../store/useAuthStore';
+import { canUpdateTicketStatus } from '../services/auth/authorization';
 
 type TicketStatus = 'OPEN' | 'CLOSED' | 'ASSIGNED';
 type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
@@ -195,13 +196,15 @@ const DashboardScreen = (): React.JSX.Element => {
                 <ActionButton title="Chat" style={styles.flexButton} />
               </View>
 
-              <View style={styles.updateRow}>
-                <View style={styles.dropdownMock}>
-                  <Text style={styles.dropdownText}>Select status</Text>
-                  <Ionicons name="chevron-down" size={14} color="#9CA3AF" />
+              {canUpdateTicketStatus(role) ? (
+                <View style={styles.updateRow}>
+                  <View style={styles.dropdownMock}>
+                    <Text style={styles.dropdownText}>Select status</Text>
+                    <Ionicons name="chevron-down" size={14} color="#9CA3AF" />
+                  </View>
+                  <ActionButton title="Update" variant="primary" style={styles.updateButton} />
                 </View>
-                <ActionButton title="Update" variant="primary" style={styles.updateButton} />
-              </View>
+              ) : null}
             </View>
           ))
         )}

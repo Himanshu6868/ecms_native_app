@@ -2,78 +2,86 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import AppButton from '../components/AppButton';
-import AppInput from '../components/AppInput';
 import SelectField from '../components/SelectField';
-import { createUser, listReportingManagers } from '../services/auth/authService';
+import { listUsersForManagement, type UserRole, updateUserRole } from '../services/auth/authService';
 import { canCreateUsers } from '../services/auth/authorization';
 import { useAuthStore } from '../store/useAuthStore';
 
-type CreateRole = 'internal_support' | 'admin' | 'super_admin';
-
-const roleOptions = [
+const roleOptions: Array<{ label: string; value: UserRole }> = [
+  { label: 'Customer', value: 'customer' },
   { label: 'Internal Support', value: 'internal_support' },
   { label: 'Admin', value: 'admin' },
   { label: 'Super Admin', value: 'super_admin' },
 ];
 
+type ManageableUser = {
+  id: string;
+  email: string;
+  full_name: string | null;
+  role: UserRole;
+};
+
 const UserManagementScreen = (): React.JSX.Element => {
   const { role: currentRole } = useAuthStore();
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [role, setRole] = useState<CreateRole>('internal_support');
-  const [reportsTo, setReportsTo] = useState<string>('');
+  const [users, setUsers] = useState<ManageableUser[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [selectedRole, setSelectedRole] = useState<UserRole>('customer');
+  const [isLoadingUsers, setIsLoadingUsers] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [isLoadingManagers, setIsLoadingManagers] = useState(true);
-  const [managerOptions, setManagerOptions] = useState<Array<{ label: string; value: string }>>([]);
 
   useEffect(() => {
-    const loadManagers = async (): Promise<void> => {
+    const loadUsers = async (): Promise<void> => {
       try {
-        setIsLoadingManagers(true);
-        const managers = await listReportingManagers();
-        setManagerOptions(managers.map((manager) => ({ label: `${manager.name} (${manager.email})`, value: manager.id })));
+        setIsLoadingUsers(true);
+        const nextUsers = await listUsersForManagement();
+        setUsers(nextUsers);
+
+        if (nextUsers.length > 0) {
+          setSelectedUserId(nextUsers[0].id);
+          setSelectedRole(nextUsers[0].role);
+        }
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unable to load reporting managers.';
+        const message = error instanceof Error ? error.message : 'Unable to load users.';
         Alert.alert('Error', message);
       } finally {
-        setIsLoadingManagers(false);
+        setIsLoadingUsers(false);
       }
     };
 
-    void loadManagers();
+    void loadUsers();
   }, []);
 
-  const reportingManagerOptions = useMemo(
-    () => [{ label: 'None', value: '' }, ...managerOptions],
-    [managerOptions],
+  const userOptions = useMemo(
+    () => users.map((user) => ({ label: `${user.full_name?.trim() || user.email} (${user.email})`, value: user.id })),
+    [users],
   );
 
-  const handleSubmit = async (): Promise<void> => {
+  const handleUserChange = (userId: string): void => {
+    setSelectedUserId(userId);
+    const selectedUser = users.find((user) => user.id === userId);
+    if (selectedUser) {
+      setSelectedRole(selectedUser.role);
+    }
+  };
+
+  const handleUpdateRole = async (): Promise<void> => {
     if (!canCreateUsers(currentRole)) {
-      Alert.alert('Unauthorized', 'Only super admins can create users.');
+      Alert.alert('Unauthorized', 'Only super admins can manage users.');
       return;
     }
 
-    if (!name.trim() || !email.trim()) {
-      Alert.alert('Validation', 'Name and email are required.');
+    if (!selectedUserId) {
+      Alert.alert('Validation', 'Select a user to update role.');
       return;
     }
 
     try {
       setIsSaving(true);
-      await createUser({
-        name: name.trim(),
-        email: email.trim().toLowerCase(),
-        role,
-        reportsTo: reportsTo || null,
-      });
-      Alert.alert('Success', 'User created successfully.');
-      setName('');
-      setEmail('');
-      setRole('internal_support');
-      setReportsTo('');
+      await updateUserRole(selectedUserId, selectedRole);
+      setUsers((prev) => prev.map((user) => (user.id === selectedUserId ? { ...user, role: selectedRole } : user)));
+      Alert.alert('Success', 'Role updated successfully.');
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to create user.';
+      const message = error instanceof Error ? error.message : 'Unable to update role.';
       Alert.alert('Error', message);
     } finally {
       setIsSaving(false);
@@ -90,27 +98,20 @@ const UserManagementScreen = (): React.JSX.Element => {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Create Internal User</Text>
-      <Text style={styles.subtitle}>Add internal support users, admins, and super admins.</Text>
+      <Text style={styles.title}>User Role Management</Text>
+      <Text style={styles.subtitle}>Super admins can assign roles in public.users.</Text>
 
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Create User</Text>
-        <AppInput value={name} onChangeText={setName} placeholder="Name" />
-        <AppInput value={email} onChangeText={setEmail} placeholder="Email" autoCapitalize="none" keyboardType="email-address" />
-        <SelectField label="User Type" value={role} onChange={(value) => setRole(value as CreateRole)} options={roleOptions} />
-        <SelectField
-          label="Reporting Manager"
-          value={reportsTo}
-          onChange={setReportsTo}
-          options={reportingManagerOptions}
-        />
+        <Text style={styles.sectionTitle}>Assign Role</Text>
+        <SelectField label="User" value={selectedUserId} onChange={handleUserChange} options={userOptions} />
+        <SelectField label="Role" value={selectedRole} onChange={(value) => setSelectedRole(value as UserRole)} options={roleOptions} />
 
         <AppButton
-          title={isSaving ? 'Creating...' : 'Create User'}
-          disabled={isSaving || isLoadingManagers}
+          title={isSaving ? 'Updating...' : 'Update Role'}
+          disabled={isSaving || isLoadingUsers || userOptions.length === 0}
           onPress={() => {
-            if (!isSaving && !isLoadingManagers) {
-              void handleSubmit();
+            if (!isSaving) {
+              void handleUpdateRole();
             }
           }}
         />
