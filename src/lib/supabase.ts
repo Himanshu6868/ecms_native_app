@@ -77,10 +77,18 @@ class SupabaseAuth {
     }
   }
 
-  signInWithOtp = async ({ email }: { email: string }): Promise<{ error: SupabaseError | null }> => {
+  signInWithOtp = async ({
+    email,
+    options,
+  }: {
+    email: string;
+    options?: {
+      shouldCreateUser?: boolean;
+    };
+  }): Promise<{ error: SupabaseError | null }> => {
     const { error } = await this.request('otp', {
       method: 'POST',
-      body: JSON.stringify({ email, create_user: false }),
+      body: JSON.stringify({ email, create_user: options?.shouldCreateUser ?? false }),
     });
 
     return { error };

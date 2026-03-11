@@ -8,7 +8,6 @@ import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 
 import { firestore } from '../services/firebase/firebase';
 import { supabase } from '../lib/supabase';
-import { requireAuthorizedUserByEmail } from '../services/auth/authService';
 import { useAuthStore } from '../store/useAuthStore';
 import Button from '../components/Button';
 import InputField from '../components/InputField';
@@ -29,7 +28,7 @@ const priorityOptions = [
 
 const TicketCreationScreen = (): React.JSX.Element => {
   const navigation = useNavigation();
-  const { user } = useAuthStore();
+  const { authUserId } = useAuthStore();
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -79,7 +78,7 @@ const TicketCreationScreen = (): React.JSX.Element => {
 
       setLocationCoordinates([latitude, longitude]);
       setLocation(`${latitude},${longitude}`);
-    } catch (error: unknown) {
+    } catch {
       Alert.alert('Location unavailable', 'Unable to capture your current location. Please try again.');
     } finally {
       setIsResolvingLocation(false);
@@ -126,13 +125,11 @@ const TicketCreationScreen = (): React.JSX.Element => {
 
     try {
       const { data: sessionData } = await supabase.auth.getSession();
-      const sessionEmail = sessionData.session?.user.email;
+      const sessionUserId = sessionData.session?.user.id;
 
-      if (!sessionEmail || !user) {
+      if (!sessionUserId || !authUserId || sessionUserId !== authUserId) {
         throw new Error('Unable to identify current user session. Please sign in again.');
       }
-
-      const userRecord = await requireAuthorizedUserByEmail(sessionEmail);
 
       const payload = {
         title: title.trim(),
@@ -141,7 +138,7 @@ const TicketCreationScreen = (): React.JSX.Element => {
         category: category.trim(),
         location: location ?? null,
         locationCoordinates: locationCoordinates ?? null,
-        createdBy: userRecord.id,
+        createdBy: sessionUserId,
         createdAt: serverTimestamp(),
         status: 'OPEN',
       };

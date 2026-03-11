@@ -5,11 +5,11 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import type { AuthUserProfile, UserRole } from '../services/auth/authService';
 
 type AuthState = {
-  user: string | null;
+  userId: string | null;
+  authUserId: string | null;
   name: string | null;
   email: string | null;
   role: UserRole | null;
-  area: string | null;
   isAuthenticated: boolean;
   loading: boolean;
   setUser: (profile: AuthUserProfile) => void;
@@ -30,31 +30,31 @@ const secureStorage = {
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
-      user: null,
+      userId: null,
+      authUserId: null,
       name: null,
       email: null,
       role: null,
-      area: null,
       isAuthenticated: false,
       loading: false,
       setUser: (profile) =>
         set({
-          user: profile.user,
+          userId: profile.userId,
+          authUserId: profile.authUserId,
           name: profile.name,
           email: profile.email,
           role: profile.role,
-          area: profile.area,
           isAuthenticated: true,
           loading: false,
         }),
       setLoading: (loading) => set({ loading }),
       logout: () =>
         set({
-          user: null,
+          userId: null,
+          authUserId: null,
           name: null,
           email: null,
           role: null,
-          area: null,
           isAuthenticated: false,
           loading: false,
         }),
@@ -63,11 +63,11 @@ export const useAuthStore = create<AuthState>()(
       name: 'auth-session-store',
       storage: createJSONStorage(() => secureStorage),
       partialize: (state) => ({
-        user: state.user,
+        userId: state.userId,
+        authUserId: state.authUserId,
         name: state.name,
         email: state.email,
         role: state.role,
-        area: state.area,
         isAuthenticated: state.isAuthenticated,
       }),
     },

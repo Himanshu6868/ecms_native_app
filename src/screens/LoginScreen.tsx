@@ -6,8 +6,8 @@ import AppButton from '../components/AppButton';
 import AppInput from '../components/AppInput';
 import { AuthStackParamList } from '../navigation/AuthStackNavigator';
 import { buildProfile, requireAuthorizedUserByEmail, sendOtp, verifyOtp } from '../services/auth/authService';
-import { getEmailError } from '../utils/validators';
 import { supabase } from '../lib/supabase';
+import { getEmailError } from '../utils/validators';
 import { useAuthStore } from '../store/useAuthStore';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
@@ -80,6 +80,7 @@ const LoginScreen = ({ navigation }: Props): React.JSX.Element => {
       setStatus('Signed in successfully. Redirecting...');
       setStatusTone('success');
     } catch (error) {
+      await supabase.auth.signOut();
       const message = error instanceof Error ? error.message : 'Unable to verify OTP.';
       setStatus(message);
       setStatusTone('error');
