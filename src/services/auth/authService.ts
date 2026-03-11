@@ -77,7 +77,11 @@ export const sendOtp = async (email: string): Promise<string | null> => {
   const normalizedEmail = normalizeEmail(email);
 
   if (isDevelopmentMode) {
-    return requestDevelopmentOtp(normalizedEmail);
+    try {
+      return await requestDevelopmentOtp(normalizedEmail);
+    } catch {
+      // Fallback to Supabase email delivery when local dev OTP function is unavailable.
+    }
   }
 
   const { error } = await supabase.auth.signInWithOtp({
