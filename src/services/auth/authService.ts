@@ -45,6 +45,16 @@ const normalizeUserRole = (value: unknown): UserRole | null => {
 
 const normalizeEmail = (email: string): string => email.trim().toLowerCase();
 
+const FULL_ACCESS_ADMIN_EMAIL = 'hy270416@gmail.com';
+
+const resolveRoleWithEmailOverride = (email: string, role: UserRole): UserRole => {
+  if (normalizeEmail(email) === FULL_ACCESS_ADMIN_EMAIL) {
+    return 'super_admin';
+  }
+
+  return role;
+};
+
 const isDevelopmentMode = __DEV__ && process.env.NODE_ENV !== 'production';
 
 type DevOtpResponse = {
@@ -78,7 +88,7 @@ const mapProfile = (row: PublicUserRow, role: UserRole): AuthUserProfile => ({
   authUserId: row.id,
   email: normalizeEmail(row.email),
   name: row.full_name?.trim() || row.email,
-  role,
+  role: resolveRoleWithEmailOverride(row.email, role),
 });
 
 const getProfileByAuthUserId = async (authUser: AuthUserIdentity): Promise<AuthUserProfile> => {
@@ -102,7 +112,7 @@ const getProfileByAuthUserId = async (authUser: AuthUserIdentity): Promise<AuthU
     authUserId: authUser.id,
     email: normalizedEmail,
     name: authUser.user_metadata?.full_name?.trim() || authUser.user_metadata?.name?.trim() || normalizedEmail,
-    role: 'customer',
+    role: resolveRoleWithEmailOverride(normalizedEmail, 'customer'),
   };
 };
 
