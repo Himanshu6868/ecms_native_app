@@ -90,7 +90,7 @@ const LoginScreen = ({ navigation }: Props): React.JSX.Element => {
         <Text style={styles.infoTitle}>Supabase Email OTP access</Text>
         <Text style={styles.bullet}>• Enter your email to receive a one-time passcode</Text>
         <Text style={styles.bullet}>• Verify OTP to create/restore your Supabase session</Text>
-        <Text style={styles.bullet}>• Role and permissions are loaded from your profile</Text>
+        <Text style={styles.bullet}>• After OTP verification, your session is logged in immediately</Text>
       </View>
 
       <View style={styles.formCard}>
@@ -131,7 +131,7 @@ const LoginScreen = ({ navigation }: Props): React.JSX.Element => {
           textContentType="oneTimeCode"
         />
 
-        <AppButton title={isSubmitting ? 'Verifying...' : 'Verify OTP'} onPress={() => void handleVerifyOtp()} disabled={isSubmitting} />
+        <AppButton title={isSubmitting ? 'Logging in...' : 'Login'} onPress={() => void handleVerifyOtp()} disabled={isSubmitting} />
 
         {emailError ? <Text style={[styles.statusText, styles.statusError]}>{emailError}</Text> : null}
         {status ? (
