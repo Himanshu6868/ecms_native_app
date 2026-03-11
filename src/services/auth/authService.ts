@@ -91,7 +91,7 @@ export const verifyOtp = async (email: string, token: string): Promise<SupabaseS
 export const getUserByEmail = async (email: string): Promise<UserRecord | null> => {
   const normalizedEmail = email.trim().toLowerCase();
   const rows = await requestUsers<Record<string, unknown>[]>(
-    `users?select=id,name,email,role&email=eq.${encodeURIComponent(normalizedEmail)}&limit=1`,
+    `users?select=id,name,email,role,area&email=ilike.${encodeURIComponent(normalizedEmail)}&limit=1`,
   );
 
   if (rows.length === 0) {
