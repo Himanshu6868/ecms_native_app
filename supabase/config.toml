@@ -1,0 +1,3 @@
+[auth]
+# OTP validity in seconds (2 hours)
+otp_expiry = 7200
