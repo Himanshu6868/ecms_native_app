@@ -10,11 +10,9 @@ type AuthState = {
   name: string | null;
   email: string | null;
   role: UserRole | null;
-  sessionToken: string | null;
   isAuthenticated: boolean;
   loading: boolean;
   setAuthState: (profile: AuthUserProfile) => void;
-  setUser: (profile: AuthUserProfile) => void;
   setLoading: (loading: boolean) => void;
   logout: () => void;
 };
@@ -37,7 +35,6 @@ export const useAuthStore = create<AuthState>()(
       name: null,
       email: null,
       role: null,
-      sessionToken: null,
       isAuthenticated: false,
       loading: false,
       setAuthState: (profile) =>
@@ -47,18 +44,6 @@ export const useAuthStore = create<AuthState>()(
           name: profile.name,
           email: profile.email,
           role: profile.role,
-          sessionToken: profile.sessionToken,
-          isAuthenticated: true,
-          loading: false,
-        }),
-      setUser: (profile) =>
-        set({
-          userId: profile.userId,
-          authUserId: profile.authUserId,
-          name: profile.name,
-          email: profile.email,
-          role: profile.role,
-          sessionToken: profile.sessionToken,
           isAuthenticated: true,
           loading: false,
         }),
@@ -70,7 +55,6 @@ export const useAuthStore = create<AuthState>()(
           name: null,
           email: null,
           role: null,
-          sessionToken: null,
           isAuthenticated: false,
           loading: false,
         }),
@@ -84,7 +68,6 @@ export const useAuthStore = create<AuthState>()(
         name: state.name,
         email: state.email,
         role: state.role,
-        sessionToken: state.sessionToken,
         isAuthenticated: state.isAuthenticated,
       }),
     },

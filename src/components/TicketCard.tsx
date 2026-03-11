@@ -17,6 +17,7 @@ export type Ticket = {
 
 type TicketCardProps = {
   ticket: Ticket;
+  canUpdateStatus?: boolean;
 };
 
 const statusVariantMap: Record<TicketStatus, 'success' | 'assigned' | 'neutral'> = {
@@ -32,7 +33,7 @@ const priorityVariantMap: Record<TicketPriority, 'neutral' | 'info' | 'warning' 
   CRITICAL: 'danger',
 };
 
-const TicketCard = ({ ticket }: TicketCardProps): React.JSX.Element => {
+const TicketCard = ({ ticket, canUpdateStatus = false }: TicketCardProps): React.JSX.Element => {
   return (
     <View style={styles.card}>
       <View style={styles.rowBetween}>
@@ -54,13 +55,15 @@ const TicketCard = ({ ticket }: TicketCardProps): React.JSX.Element => {
         <Button title="Chat" variant="secondary" style={styles.flexButton} onPress={() => undefined} />
       </View>
 
-      <View style={styles.updateRow}>
-        <View style={styles.dropdownMock}>
-          <Text style={styles.dropdownText}>Select status</Text>
-          <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
+      {canUpdateStatus ? (
+        <View style={styles.updateRow}>
+          <View style={styles.dropdownMock}>
+            <Text style={styles.dropdownText}>Select status</Text>
+            <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
+          </View>
+          <Button title="Update" style={styles.updateButton} onPress={() => undefined} />
         </View>
-        <Button title="Update" style={styles.updateButton} onPress={() => undefined} />
-      </View>
+      ) : null}
     </View>
   );
 };

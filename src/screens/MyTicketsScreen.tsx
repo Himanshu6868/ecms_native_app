@@ -7,7 +7,7 @@ import Badge from '../components/Badge';
 import TicketCard, { Ticket } from '../components/TicketCard';
 import { firestore } from '../services/firebase/firebase';
 import { useAuthStore } from '../store/useAuthStore';
-import { canViewAllTickets } from '../services/auth/authorization';
+import { canUpdateTicketStatus, canViewAllTickets } from '../services/auth/authorization';
 
 const TICKETS_COLLECTION = 'tickets';
 
@@ -100,7 +100,7 @@ const MyTicketsScreen = (): React.JSX.Element => {
         <FlatList
           data={filteredTickets}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <TicketCard ticket={item} />}
+          renderItem={({ item }) => <TicketCard ticket={item} canUpdateStatus={canUpdateTicketStatus(role)} />}
           contentContainerStyle={styles.listContent}
           ListEmptyComponent={
             <View style={styles.emptyWrap}>

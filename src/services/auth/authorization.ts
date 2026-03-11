@@ -7,4 +7,6 @@ export const canAccessInternalApp = (role: UserRole | null): boolean =>
 
 export const canViewAllTickets = (role: UserRole | null): boolean => canAccessInternalApp(role);
 
+export const canUpdateTicketStatus = (role: UserRole | null): boolean => role === 'admin' || role === 'super_admin';
+
 export const canCreateTickets = (role: UserRole | null): boolean => role === 'customer';
