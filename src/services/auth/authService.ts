@@ -68,9 +68,6 @@ const mapUserRecord = (row: Record<string, unknown>): UserRecord => {
 export const sendOtp = async (email: string): Promise<void> => {
   const { error } = await supabase.auth.signInWithOtp({
     email,
-    options: {
-      shouldCreateUser: false,
-    },
   });
 
   if (error) {
@@ -99,7 +96,7 @@ export const verifyOtp = async (email: string, token: string): Promise<SupabaseS
 export const getUserByEmail = async (email: string): Promise<UserRecord | null> => {
   const normalizedEmail = email.trim().toLowerCase();
   const rows = await requestUsers<Record<string, unknown>[]>(
-    `users?select=id,name,email,role,reports_to&email=eq.${encodeURIComponent(normalizedEmail)}&deleted_at=is.null&limit=1`,
+    `users?select=id,name,email,role,reports_to&email=ilike.${encodeURIComponent(normalizedEmail)}&deleted_at=is.null&limit=1`,
   );
 
   if (rows.length === 0) {
