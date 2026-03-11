@@ -52,6 +52,16 @@ const isUserRole = (value: unknown): value is UserRole =>
 
 const normalizeEmail = (email: string): string => email.trim().toLowerCase();
 
+const formatEdgeFunctionError = (message: string, functionName: string): string => {
+  const normalizedMessage = message.trim().toLowerCase();
+
+  if (normalizedMessage.includes('requested function was not found')) {
+    return `The Supabase Edge Function "${functionName}" was not found. Deploy your functions and try again.`;
+  }
+
+  return message;
+};
+
 const invokeEdgeFunction = async <T>(name: string, body: Record<string, unknown>, token?: string): Promise<T> => {
   const response = await fetch(`${supabaseUrl}/functions/v1/${name}`, {
     method: 'POST',
@@ -79,7 +89,7 @@ const invokeEdgeFunction = async <T>(name: string, body: Record<string, unknown>
       (typeof json.msg === 'string' && json.msg) ||
       raw ||
       'Request failed.';
-    throw new Error(message);
+    throw new Error(formatEdgeFunctionError(message, name));
   }
 
   return json as T;
