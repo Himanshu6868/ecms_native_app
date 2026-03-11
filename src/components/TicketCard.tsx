@@ -50,8 +50,8 @@ const TicketCard = ({ ticket }: TicketCardProps): React.JSX.Element => {
       </View>
 
       <View style={styles.buttonRow}>
-        <Button title="Details" variant="secondary" style={styles.flexButton} onPress={() => console.log('Open details')} />
-        <Button title="Chat" variant="secondary" style={styles.flexButton} onPress={() => console.log('Open chat')} />
+        <Button title="Details" variant="secondary" style={styles.flexButton} onPress={() => undefined} />
+        <Button title="Chat" variant="secondary" style={styles.flexButton} onPress={() => undefined} />
       </View>
 
       <View style={styles.updateRow}>
@@ -59,7 +59,7 @@ const TicketCard = ({ ticket }: TicketCardProps): React.JSX.Element => {
           <Text style={styles.dropdownText}>Select status</Text>
           <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
         </View>
-        <Button title="Update" style={styles.updateButton} onPress={() => console.log('Status updated')} />
+        <Button title="Update" style={styles.updateButton} onPress={() => undefined} />
       </View>
     </View>
   );

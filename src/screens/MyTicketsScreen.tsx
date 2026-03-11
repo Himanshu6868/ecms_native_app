@@ -24,10 +24,10 @@ const MyTicketsScreen = (): React.JSX.Element => {
   const [searchQuery, setSearchQuery] = useState('');
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { user, role } = useAuthStore();
+  const { authUserId, role } = useAuthStore();
 
   useEffect(() => {
-    if (!user) {
+    if (!authUserId) {
       setTickets([]);
       setIsLoading(false);
       return;
@@ -36,7 +36,7 @@ const MyTicketsScreen = (): React.JSX.Element => {
     const baseRef = collection(firestore, TICKETS_COLLECTION);
     const ticketsQuery =
       role === 'customer'
-        ? query(baseRef, where('createdBy', '==', user), orderBy('createdAt', 'desc'))
+        ? query(baseRef, where('createdBy', '==', authUserId), orderBy('createdAt', 'desc'))
         : query(baseRef, orderBy('createdAt', 'desc'));
 
     const unsubscribe = onSnapshot(
@@ -53,7 +53,7 @@ const MyTicketsScreen = (): React.JSX.Element => {
     );
 
     return unsubscribe;
-  }, [role, user]);
+  }, [authUserId, role]);
 
   const filteredTickets = useMemo(() => {
     const queryText = searchQuery.trim().toLowerCase();

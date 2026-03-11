@@ -1,24 +1,32 @@
 import { supabase, supabaseAnonKey, supabaseUrl, type SupabaseSession, type SupabaseUser } from '../../lib/supabase';
 
-export type UserRole = 'customer' | 'internal' | 'admin';
+export type UserRole = 'customer' | 'internal_support' | 'admin' | 'super_admin';
 
 export type UserRecord = {
   id: string;
   name: string;
   email: string;
   role: UserRole;
-  area: string | null;
+  reportsTo: string | null;
 };
 
 export type AuthUserProfile = {
-  user: string;
+  userId: string;
+  authUserId: string;
   email: string;
   name: string;
   role: UserRole;
-  area: string | null;
 };
 
-const isUserRole = (value: unknown): value is UserRole => value === 'customer' || value === 'internal' || value === 'admin';
+type UserInsertPayload = {
+  name: string;
+  email: string;
+  role: Exclude<UserRole, 'customer'>;
+  reportsTo: string | null;
+};
+
+const isUserRole = (value: unknown): value is UserRole =>
+  value === 'customer' || value === 'internal_support' || value === 'admin' || value === 'super_admin';
 
 const requestUsers = async <T>(pathAndQuery: string, init?: RequestInit): Promise<T> => {
   const { data: sessionData } = await supabase.auth.getSession();
@@ -53,7 +61,7 @@ const mapUserRecord = (row: Record<string, unknown>): UserRecord => {
     name: String(row.name ?? ''),
     email: String(row.email ?? '').toLowerCase(),
     role,
-    area: typeof row.area === 'string' ? row.area : null,
+    reportsTo: typeof row.reports_to === 'string' ? row.reports_to : null,
   };
 };
 
@@ -67,7 +75,7 @@ export const sendOtp = async (email: string): Promise<void> => {
 
   if (error) {
     if (error.message.toLowerCase().includes('signups not allowed')) {
-      throw new Error('Login denied. This email is not authorized.');
+      throw new Error('User not authorized');
     }
 
     throw new Error(error.message);
@@ -91,7 +99,7 @@ export const verifyOtp = async (email: string, token: string): Promise<SupabaseS
 export const getUserByEmail = async (email: string): Promise<UserRecord | null> => {
   const normalizedEmail = email.trim().toLowerCase();
   const rows = await requestUsers<Record<string, unknown>[]>(
-    `users?select=id,name,email,role,area&email=ilike.${encodeURIComponent(normalizedEmail)}&limit=1`,
+    `users?select=id,name,email,role,reports_to&email=eq.${encodeURIComponent(normalizedEmail)}&deleted_at=is.null&limit=1`,
   );
 
   if (rows.length === 0) {
@@ -105,27 +113,34 @@ export const requireAuthorizedUserByEmail = async (email: string): Promise<UserR
   const userRecord = await getUserByEmail(email);
 
   if (!userRecord) {
-    throw new Error('Login denied. This email is not authorized.');
+    throw new Error('User not authorized');
   }
 
   return userRecord;
 };
 
 export const buildProfile = (user: SupabaseUser, userRecord: UserRecord): AuthUserProfile => ({
-  user: userRecord.id,
+  userId: userRecord.id,
+  authUserId: user.id,
   email: user.email ?? userRecord.email,
   name: userRecord.name,
   role: userRecord.role,
-  area: userRecord.area,
 });
 
-export const createUser = async (payload: {
-  name: string;
-  email: string;
-  role: UserRole;
-  area?: string;
-}): Promise<UserRecord> => {
-  const rows = await requestUsers<Record<string, unknown>[]>('users?select=id,name,email,role', {
+export const listReportingManagers = async (): Promise<Array<{ id: string; name: string; email: string }>> => {
+  const rows = await requestUsers<Record<string, unknown>[]>(
+    'users?select=id,name,email,role&role=in.(admin,super_admin)&deleted_at=is.null&order=name.asc',
+  );
+
+  return rows.map((row) => ({
+    id: String(row.id ?? ''),
+    name: String(row.name ?? ''),
+    email: String(row.email ?? '').toLowerCase(),
+  }));
+};
+
+export const createUser = async (payload: UserInsertPayload): Promise<UserRecord> => {
+  const rows = await requestUsers<Record<string, unknown>[]>('users?select=id,name,email,role,reports_to', {
     method: 'POST',
     headers: {
       Prefer: 'return=representation',
@@ -134,6 +149,13 @@ export const createUser = async (payload: {
       name: payload.name,
       email: payload.email.toLowerCase(),
       role: payload.role,
+      reports_to: payload.reportsTo,
+      area_id: null,
+      deleted_at: null,
+      otp_hash: null,
+      otp_expires_at: null,
+      otp_retry_count: 0,
+      otp_verified_at: null,
     }),
   });
 

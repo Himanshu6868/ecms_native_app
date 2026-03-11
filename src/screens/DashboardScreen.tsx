@@ -114,7 +114,7 @@ const DashboardScreen = (): React.JSX.Element => {
         <View style={styles.headerTextWrap}>
           <Text style={styles.appTitle}>ECMS Console</Text>
           <Text style={styles.subtitle}>Enterprise Case Management</Text>
-          <Text style={styles.roleLabel}>Role: {(role ?? 'internal').toUpperCase()}</Text>
+          <Text style={styles.roleLabel}>Role: {(role ?? 'internal_support').toUpperCase()}</Text>
         </View>
         <View style={styles.liveQueueBadge}>
           <Text style={styles.liveQueueText}>Live queue: last 20 tickets</Text>

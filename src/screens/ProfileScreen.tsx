@@ -6,7 +6,7 @@ import { logout as supabaseLogout } from '../services/auth/authService';
 import { useAuthStore } from '../store/useAuthStore';
 
 const ProfileScreen = (): React.JSX.Element => {
-  const { user, name, email, role, logout } = useAuthStore();
+  const { userId, authUserId, name, email, role, logout } = useAuthStore();
 
   const handleLogout = async (): Promise<void> => {
     try {
@@ -40,12 +40,13 @@ const ProfileScreen = (): React.JSX.Element => {
         <Text style={styles.email}>{email ?? '-'}</Text>
 
         <View style={styles.roleBadge}>
-          <Text style={styles.roleText}>{(role ?? 'user').toUpperCase()}</Text>
+          <Text style={styles.roleText}>{(role ?? 'customer').toUpperCase()}</Text>
         </View>
 
         <View style={styles.infoSection}>
           <InfoRow label="Department" value="Support" />
-          <InfoRow label="User ID" value={user ?? '-'} />
+          <InfoRow label="User ID" value={userId ?? '-'} />
+          <InfoRow label="Auth ID" value={authUserId ?? '-'} />
         </View>
       </View>
 
