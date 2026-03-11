@@ -18,6 +18,15 @@ type PublicUserRow = {
   role: string | null;
 };
 
+type AuthUserIdentity = {
+  id: string;
+  email?: string | null;
+  user_metadata?: {
+    full_name?: string | null;
+    name?: string | null;
+  } | null;
+};
+
 const normalizeUserRole = (value: unknown): UserRole | null => {
   if (value === 'customer' || value === 'internal_support' || value === 'admin' || value === 'super_admin') {
     return value;
@@ -72,20 +81,29 @@ const mapProfile = (row: PublicUserRow, role: UserRole): AuthUserProfile => ({
   role,
 });
 
-const getProfileByAuthUserId = async (authUserId: string): Promise<AuthUserProfile> => {
-  const { data, error } = await supabase.from('users').select('id,email,full_name,avatar_url,role').eq('id', authUserId).single<PublicUserRow>();
+const getProfileByAuthUserId = async (authUser: AuthUserIdentity): Promise<AuthUserProfile> => {
+  const { data, error } = await supabase.from('users').select('id,email,full_name,avatar_url,role').eq('id', authUser.id).maybeSingle<PublicUserRow>();
 
-  if (error) {
+  if (error && error.code !== 'PGRST116') {
     throw new Error(error.message || 'Unable to load profile.');
   }
 
-  const normalizedRole = normalizeUserRole(data?.role);
-
-  if (!data || !normalizedRole) {
-    throw new Error('User role is invalid for this application.');
+  if (data?.id && data?.email) {
+    return mapProfile(data, normalizeUserRole(data.role) ?? 'customer');
   }
 
-  return mapProfile(data, normalizedRole);
+  const normalizedEmail = normalizeEmail(authUser.email ?? '');
+  if (!normalizedEmail) {
+    throw new Error('Authenticated user email is missing.');
+  }
+
+  return {
+    userId: authUser.id,
+    authUserId: authUser.id,
+    email: normalizedEmail,
+    name: authUser.user_metadata?.full_name?.trim() || authUser.user_metadata?.name?.trim() || normalizedEmail,
+    role: 'customer',
+  };
 };
 
 export const sendOtp = async (email: string): Promise<string | null> => {
@@ -135,7 +153,7 @@ export const verifyOtp = async (email: string, token: string): Promise<AuthUserP
     throw new Error(userError?.message || 'Authenticated user not found.');
   }
 
-  return getProfileByAuthUserId(user.id);
+  return getProfileByAuthUserId(user);
 };
 
 export const resolveAuthorizedProfile = async (): Promise<AuthUserProfile | null> => {
@@ -161,7 +179,7 @@ export const resolveAuthorizedProfile = async (): Promise<AuthUserProfile | null
     throw new Error(userError?.message || 'Unable to restore authenticated user.');
   }
 
-  return getProfileByAuthUserId(user.id);
+  return getProfileByAuthUserId(user);
 };
 
 export const getAuthenticatedUserId = async (): Promise<string | null> => {
