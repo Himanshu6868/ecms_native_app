@@ -58,16 +58,27 @@ const invokeEdgeFunction = async <T>(name: string, body: Record<string, unknown>
     headers: {
       apikey: supabaseAnonKey,
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      Authorization: `Bearer ${token ?? supabaseAnonKey}`,
     },
     body: JSON.stringify(body),
   });
 
   const raw = (await response.text()) || '{}';
-  const json = JSON.parse(raw) as Record<string, unknown>;
+  const json = (() => {
+    try {
+      return JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      return {} as Record<string, unknown>;
+    }
+  })();
 
   if (!response.ok) {
-    const message = typeof json.error === 'string' ? json.error : 'Request failed.';
+    const message =
+      (typeof json.error === 'string' && json.error) ||
+      (typeof json.message === 'string' && json.message) ||
+      (typeof json.msg === 'string' && json.msg) ||
+      raw ||
+      'Request failed.';
     throw new Error(message);
   }
 
