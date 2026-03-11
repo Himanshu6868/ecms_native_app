@@ -7,7 +7,7 @@ import LandingScreen from '../screens/LandingScreen';
 import LoginScreen from '../screens/LoginScreen';
 import CustomerStackNavigator from './CustomerStackNavigator';
 import InternalStackNavigator from './InternalStackNavigator';
-import { buildProfile, requireAuthorizedUserByEmail } from '../services/auth/authService';
+import { resolveAuthorizedProfile } from '../services/auth/authService';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/useAuthStore';
 
@@ -33,7 +33,7 @@ const appTheme = {
 };
 
 const AuthStackNavigator = (): React.JSX.Element => {
-  const { isAuthenticated, role, setUser, logout, setLoading } = useAuthStore();
+  const { isAuthenticated, role, loading: authLoading, setAuthState, logout, setLoading } = useAuthStore();
   const [bootstrapping, setBootstrapping] = useState(true);
 
   useEffect(() => {
@@ -43,8 +43,8 @@ const AuthStackNavigator = (): React.JSX.Element => {
         const { data: sessionData } = await supabase.auth.getSession();
 
         if (sessionData.session?.user?.email) {
-          const userRecord = await requireAuthorizedUserByEmail(sessionData.session.user.email);
-          setUser(buildProfile(sessionData.session.user, userRecord));
+          const profile = await resolveAuthorizedProfile();
+          setAuthState(profile);
         } else {
           logout();
         }
@@ -67,8 +67,8 @@ const AuthStackNavigator = (): React.JSX.Element => {
 
       if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user.email) {
         try {
-          const userRecord = await requireAuthorizedUserByEmail(session.user.email);
-          setUser(buildProfile(session.user, userRecord));
+          const profile = await resolveAuthorizedProfile();
+          setAuthState(profile);
         } catch {
           await supabase.auth.signOut();
           logout();
@@ -79,9 +79,9 @@ const AuthStackNavigator = (): React.JSX.Element => {
     return () => {
       listener.subscription.unsubscribe();
     };
-  }, [logout, setLoading, setUser]);
+  }, [logout, setAuthState, setLoading]);
 
-  if (bootstrapping) {
+  if (bootstrapping || authLoading) {
     return (
       <View style={styles.loaderWrap}>
         <ActivityIndicator size="large" color="#60A5FA" />

@@ -12,6 +12,7 @@ type AuthState = {
   role: UserRole | null;
   isAuthenticated: boolean;
   loading: boolean;
+  setAuthState: (profile: AuthUserProfile) => void;
   setUser: (profile: AuthUserProfile) => void;
   setLoading: (loading: boolean) => void;
   logout: () => void;
@@ -37,6 +38,16 @@ export const useAuthStore = create<AuthState>()(
       role: null,
       isAuthenticated: false,
       loading: false,
+      setAuthState: (profile) =>
+        set({
+          userId: profile.userId,
+          authUserId: profile.authUserId,
+          name: profile.name,
+          email: profile.email,
+          role: profile.role,
+          isAuthenticated: true,
+          loading: false,
+        }),
       setUser: (profile) =>
         set({
           userId: profile.userId,

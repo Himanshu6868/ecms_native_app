@@ -5,7 +5,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import AppButton from '../components/AppButton';
 import AppInput from '../components/AppInput';
 import { AuthStackParamList } from '../navigation/AuthStackNavigator';
-import { buildProfile, requireAuthorizedUserByEmail, sendOtp, verifyOtp } from '../services/auth/authService';
+import { requireAuthorizedUserByEmail, resolveAuthorizedProfile, sendOtp, verifyOtp } from '../services/auth/authService';
 import { supabase } from '../lib/supabase';
 import { getEmailError } from '../utils/validators';
 import { useAuthStore } from '../store/useAuthStore';
@@ -13,7 +13,7 @@ import { useAuthStore } from '../store/useAuthStore';
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
 const LoginScreen = ({ navigation }: Props): React.JSX.Element => {
-  const { setUser } = useAuthStore();
+  const { setAuthState } = useAuthStore();
   const [email, setEmail] = useState('');
   const [enteredOtp, setEnteredOtp] = useState('');
   const [status, setStatus] = useState<string | null>(null);
@@ -23,15 +23,9 @@ const LoginScreen = ({ navigation }: Props): React.JSX.Element => {
 
   const emailError = useMemo(() => getEmailError(email.trim().toLowerCase()), [email]);
 
-  const finalizeLogin = async (normalizedEmail: string): Promise<void> => {
-    const { data } = await supabase.auth.getUser();
-
-    if (!data.user) {
-      throw new Error('Session not found after OTP verification.');
-    }
-
-    const userRecord = await requireAuthorizedUserByEmail(normalizedEmail);
-    setUser(buildProfile(data.user, userRecord));
+  const finalizeLogin = async (): Promise<void> => {
+    const profile = await resolveAuthorizedProfile();
+    setAuthState(profile);
   };
 
   const handleSendOtp = async (): Promise<void> => {
@@ -76,7 +70,7 @@ const LoginScreen = ({ navigation }: Props): React.JSX.Element => {
       setStatus(null);
 
       await verifyOtp(normalizedEmail, otpValue);
-      await finalizeLogin(normalizedEmail);
+      await finalizeLogin();
       setStatus('Signed in successfully. Redirecting...');
       setStatusTone('success');
     } catch (error) {

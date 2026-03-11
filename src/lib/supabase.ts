@@ -25,6 +25,17 @@ type SupabaseError = {
   message: string;
 };
 
+type PostgrestFilter = {
+  column: string;
+  operator: 'ilike';
+  value: string;
+};
+
+type PostgrestSingleResponse<T> = {
+  data: T | null;
+  error: SupabaseError | null;
+};
+
 type AuthStateCallback = (event: AuthEvent, session: SupabaseSession | null) => void;
 
 const SESSION_KEY = 'supabase_session';
@@ -136,9 +147,9 @@ class SupabaseAuth {
     return { error: null };
   };
 
-  getSession = async (): Promise<{ data: { session: SupabaseSession | null } }> => {
+  getSession = async (): Promise<{ data: { session: SupabaseSession | null }; error: SupabaseError | null }> => {
     await this.hydrateSession();
-    return { data: { session: this.session } };
+    return { data: { session: this.session }, error: null };
   };
 
   getUser = async (): Promise<{ data: { user: SupabaseUser | null } }> => {
@@ -161,6 +172,64 @@ class SupabaseAuth {
   };
 }
 
+class SupabaseQueryBuilder<T extends Record<string, unknown>> {
+  private selectColumns = '*';
+
+  private filters: PostgrestFilter[] = [];
+
+  constructor(
+    private readonly table: string,
+    private readonly auth: SupabaseAuth,
+  ) {}
+
+  select = (columns: string): this => {
+    this.selectColumns = columns;
+    return this;
+  };
+
+  ilike = (column: string, value: string): this => {
+    this.filters.push({ column, operator: 'ilike', value });
+    return this;
+  };
+
+  single = async (): Promise<PostgrestSingleResponse<T>> => {
+    const params = new URLSearchParams();
+    params.set('select', this.selectColumns);
+    this.filters.forEach((filter) => {
+      params.set(filter.column, `${filter.operator}.${filter.value}`);
+    });
+    params.set('limit', '1');
+
+    const { data: sessionData } = await this.auth.getSession();
+    if (!sessionData.session) {
+      return { data: null, error: { message: 'Session not ready' } };
+    }
+
+    try {
+      const response = await fetch(`${supabaseUrl}/rest/v1/${this.table}?${params.toString()}`, {
+        method: 'GET',
+        headers: {
+          apikey: supabaseAnonKey,
+          Authorization: `Bearer ${sessionData.session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const message = await response.text();
+        return { data: null, error: { message: message || 'Failed to query table.' } };
+      }
+
+      const rows = (await response.json()) as T[];
+
+      return { data: rows[0] ?? null, error: null };
+    } catch {
+      return { data: null, error: { message: 'Network error. Please try again.' } };
+    }
+  };
+}
+
 export const supabase = {
   auth: new SupabaseAuth(),
+  from: <T extends Record<string, unknown>>(table: string): SupabaseQueryBuilder<T> => new SupabaseQueryBuilder(table, supabase.auth),
 };
