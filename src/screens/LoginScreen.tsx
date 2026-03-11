@@ -16,6 +16,7 @@ const LoginScreen = ({ navigation }: Props): React.JSX.Element => {
   const [email, setEmail] = useState('');
   const [enteredOtp, setEnteredOtp] = useState('');
   const [status, setStatus] = useState<string | null>(null);
+  const [devOtp, setDevOtp] = useState<string | null>(null);
   const [statusTone, setStatusTone] = useState<'success' | 'error' | 'info'>('info');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRequestingOtp, setIsRequestingOtp] = useState(false);
@@ -33,8 +34,10 @@ const LoginScreen = ({ navigation }: Props): React.JSX.Element => {
     try {
       setIsRequestingOtp(true);
       setStatus(null);
-      await sendOtp(normalizedEmail);
-      setStatus('OTP sent to your email. Enter the code to continue.');
+      setDevOtp(null);
+      const otp = await sendOtp(normalizedEmail);
+      setDevOtp(otp);
+      setStatus(otp ? 'OTP generated for development. Enter the code to continue.' : 'OTP sent to your email. Enter the code to continue.');
       setStatusTone('success');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to send OTP.';
@@ -99,6 +102,7 @@ const LoginScreen = ({ navigation }: Props): React.JSX.Element => {
           onChangeText={(value) => {
             setEmail(value);
             setEnteredOtp('');
+            setDevOtp(null);
           }}
           placeholder="you@company.com"
           keyboardType="email-address"
@@ -108,6 +112,14 @@ const LoginScreen = ({ navigation }: Props): React.JSX.Element => {
         />
 
         <AppButton title={isRequestingOtp ? 'Sending OTP...' : 'Send OTP'} onPress={() => void handleSendOtp()} disabled={isRequestingOtp} />
+
+        {__DEV__ && devOtp ? (
+          <View style={styles.otpCard}>
+            <Text style={styles.otpLabel}>OTP (dev only)</Text>
+            <Text style={styles.otpValue}>{devOtp}</Text>
+            <Text style={styles.otpNote}>Use this code for local testing. Production never exposes OTPs in-app.</Text>
+          </View>
+        ) : null}
 
         <AppInput
           value={enteredOtp}

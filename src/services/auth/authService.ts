@@ -1,4 +1,4 @@
-import { supabase } from '../../lib/supabase';
+import { supabase, supabaseAnonKey, supabaseUrl } from '../../lib/supabase';
 
 export type UserRole = 'customer' | 'internal_support' | 'admin' | 'super_admin';
 
@@ -23,6 +23,34 @@ const isUserRole = (value: unknown): value is UserRole =>
 
 const normalizeEmail = (email: string): string => email.trim().toLowerCase();
 
+const isDevelopmentMode = __DEV__ && process.env.NODE_ENV !== 'production';
+
+type DevOtpResponse = {
+  success: boolean;
+  otp?: string;
+  error?: string;
+};
+
+const requestDevelopmentOtp = async (email: string): Promise<string> => {
+  const response = await fetch(`${supabaseUrl}/functions/v1/dev-request-otp`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: supabaseAnonKey,
+      Authorization: `Bearer ${supabaseAnonKey}`,
+    },
+    body: JSON.stringify({ email }),
+  });
+
+  const payload = (await response.json().catch(() => ({ success: false, error: 'Invalid OTP response.' }))) as DevOtpResponse;
+
+  if (!response.ok || !payload.success || !payload.otp) {
+    throw new Error(payload.error || 'Unable to request development OTP.');
+  }
+
+  return payload.otp;
+};
+
 const mapProfile = (row: PublicUserRow): AuthUserProfile => ({
   userId: row.id,
   authUserId: row.id,
@@ -45,8 +73,12 @@ const getProfileByAuthUserId = async (authUserId: string): Promise<AuthUserProfi
   return mapProfile(data);
 };
 
-export const sendOtp = async (email: string): Promise<void> => {
+export const sendOtp = async (email: string): Promise<string | null> => {
   const normalizedEmail = normalizeEmail(email);
+
+  if (isDevelopmentMode) {
+    return requestDevelopmentOtp(normalizedEmail);
+  }
 
   const { error } = await supabase.auth.signInWithOtp({
     email: normalizedEmail,
@@ -58,6 +90,8 @@ export const sendOtp = async (email: string): Promise<void> => {
   if (error) {
     throw new Error(error.message || 'Unable to send OTP.');
   }
+
+  return null;
 };
 
 export const verifyOtp = async (email: string, token: string): Promise<AuthUserProfile> => {
