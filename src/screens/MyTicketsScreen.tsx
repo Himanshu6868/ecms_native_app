@@ -7,6 +7,7 @@ import Badge from '../components/Badge';
 import TicketCard, { Ticket } from '../components/TicketCard';
 import { firestore } from '../services/firebase/firebase';
 import { useAuthStore } from '../store/useAuthStore';
+import { canViewAllTickets } from '../services/auth/authorization';
 
 const TICKETS_COLLECTION = 'tickets';
 
@@ -34,10 +35,9 @@ const MyTicketsScreen = (): React.JSX.Element => {
     }
 
     const baseRef = collection(firestore, TICKETS_COLLECTION);
-    const ticketsQuery =
-      role === 'customer'
-        ? query(baseRef, where('createdBy', '==', authUserId), orderBy('createdAt', 'desc'))
-        : query(baseRef, orderBy('createdAt', 'desc'));
+    const ticketsQuery = canViewAllTickets(role)
+      ? query(baseRef, orderBy('createdAt', 'desc'))
+      : query(baseRef, where('createdBy', '==', authUserId), orderBy('createdAt', 'desc'));
 
     const unsubscribe = onSnapshot(
       ticketsQuery,
@@ -71,9 +71,9 @@ const MyTicketsScreen = (): React.JSX.Element => {
     <View style={styles.screen}>
       <View style={styles.headerCard}>
         <View>
-          <Text style={styles.title}>{role === 'customer' ? 'My Tickets' : 'Ticket Management'}</Text>
+          <Text style={styles.title}>{canViewAllTickets(role) ? 'Ticket Management' : 'My Tickets'}</Text>
           <Text style={styles.subtitle}>
-            {role === 'customer' ? 'Tickets created by your account' : 'Operational visibility across all tickets'}
+            {canViewAllTickets(role) ? 'Operational visibility across all tickets' : 'Tickets created by your account'}
           </Text>
         </View>
         <Badge label={`${tickets.length} Total`} variant="active" />
@@ -105,7 +105,7 @@ const MyTicketsScreen = (): React.JSX.Element => {
           ListEmptyComponent={
             <View style={styles.emptyWrap}>
               <Ionicons name="ticket-outline" size={42} color="#6B7280" />
-              <Text style={styles.emptyText}>{role === 'customer' ? 'No tickets created by you' : 'No tickets found'}</Text>
+              <Text style={styles.emptyText}>{canViewAllTickets(role) ? 'No tickets found' : 'No tickets created by you'}</Text>
             </View>
           }
           showsVerticalScrollIndicator={false}

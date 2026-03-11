@@ -28,6 +28,8 @@ type UserInsertPayload = {
 const isUserRole = (value: unknown): value is UserRole =>
   value === 'customer' || value === 'internal_support' || value === 'admin' || value === 'super_admin';
 
+const normalizeEmail = (email: string): string => email.trim().toLowerCase();
+
 const requestUsers = async <T>(pathAndQuery: string, init?: RequestInit): Promise<T> => {
   const { data: sessionData } = await supabase.auth.getSession();
 
@@ -59,42 +61,26 @@ const mapUserRecord = (row: Record<string, unknown>): UserRecord => {
   return {
     id: String(row.id ?? ''),
     name: String(row.name ?? ''),
-    email: String(row.email ?? '').toLowerCase(),
+    email: normalizeEmail(String(row.email ?? '')),
     role,
     reportsTo: typeof row.reports_to === 'string' ? row.reports_to : null,
   };
 };
 
-const getSessionOrThrow = async (): Promise<SupabaseSession> => {
-  const {
-    data: { session },
-    error,
-  } = await supabase.auth.getSession();
-
-  if (error || !session) {
-    throw new Error('Session not ready');
-  }
-
-  return session;
-};
-
 export const sendOtp = async (email: string): Promise<void> => {
+  const normalizedEmail = normalizeEmail(email);
   const { error } = await supabase.auth.signInWithOtp({
-    email,
+    email: normalizedEmail,
   });
 
   if (error) {
-    if (error.message.toLowerCase().includes('signups not allowed')) {
-      throw new Error('User not authorized');
-    }
-
-    throw new Error(error.message);
+    throw new Error(error.message || 'Unable to send OTP.');
   }
 };
 
 export const verifyOtp = async (email: string, token: string): Promise<SupabaseSession> => {
   const { data, error } = await supabase.auth.verifyOtp({
-    email,
+    email: normalizeEmail(email),
     token,
     type: 'email',
   });
@@ -107,9 +93,9 @@ export const verifyOtp = async (email: string, token: string): Promise<SupabaseS
 };
 
 export const getUserByEmail = async (email: string): Promise<UserRecord | null> => {
-  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedEmail = normalizeEmail(email);
   const rows = await requestUsers<Record<string, unknown>[]>(
-    `users?select=id,name,email,role,reports_to&email=ilike.${encodeURIComponent(normalizedEmail)}&deleted_at=is.null&limit=1`,
+    `users?select=id,name,email,role,reports_to&email=eq.${encodeURIComponent(normalizedEmail)}&deleted_at=is.null&limit=1`,
   );
 
   if (rows.length === 0) {
@@ -119,44 +105,52 @@ export const getUserByEmail = async (email: string): Promise<UserRecord | null> 
   return mapUserRecord(rows[0]);
 };
 
-export const requireAuthorizedUserByEmail = async (email: string): Promise<UserRecord> => {
-  const userRecord = await getUserByEmail(email);
+export const buildProfile = (user: SupabaseUser, userRecord: UserRecord): AuthUserProfile => ({
+  userId: userRecord.id,
+  authUserId: user.id,
+  email: normalizeEmail(user.email ?? userRecord.email),
+  name: userRecord.name,
+  role: userRecord.role,
+});
+
+const authorizeAuthenticatedUser = async (user: SupabaseUser): Promise<AuthUserProfile> => {
+  const normalizedEmail = normalizeEmail(user.email ?? '');
+
+  if (!normalizedEmail) {
+    throw new Error('User not authorized');
+  }
+
+  const userRecord = await getUserByEmail(normalizedEmail);
 
   if (!userRecord) {
     throw new Error('User not authorized');
   }
 
-  return userRecord;
+  return buildProfile(user, userRecord);
 };
 
-export const buildProfile = (user: SupabaseUser, userRecord: UserRecord): AuthUserProfile => ({
-  userId: userRecord.id,
-  authUserId: user.id,
-  email: user.email ?? userRecord.email,
-  name: userRecord.name,
-  role: userRecord.role,
-});
-
 export const resolveAuthorizedProfile = async (): Promise<AuthUserProfile> => {
-  const session = await getSessionOrThrow();
-  const email = session.user.email?.trim().toLowerCase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!email) {
+  if (!user) {
     throw new Error('User not authorized');
   }
 
-  // NOTE: Supabase RLS must allow authenticated users to SELECT from public.users.
-  const { data: user, error } = await supabase
-    .from<Record<string, unknown>>('users')
-    .select('*')
-    .ilike('email', email)
-    .single();
+  return authorizeAuthenticatedUser(user);
+};
 
-  if (error || !user) {
-    throw new Error('User not authorized');
+export const completeOtpLogin = async (): Promise<AuthUserProfile> => {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error('Login failed. Session user not found.');
   }
 
-  return buildProfile(session.user, mapUserRecord(user));
+  return authorizeAuthenticatedUser(user);
 };
 
 export const listReportingManagers = async (): Promise<Array<{ id: string; name: string; email: string }>> => {
@@ -167,7 +161,7 @@ export const listReportingManagers = async (): Promise<Array<{ id: string; name:
   return rows.map((row) => ({
     id: String(row.id ?? ''),
     name: String(row.name ?? ''),
-    email: String(row.email ?? '').toLowerCase(),
+    email: normalizeEmail(String(row.email ?? '')),
   }));
 };
 
@@ -179,15 +173,10 @@ export const createUser = async (payload: UserInsertPayload): Promise<UserRecord
     },
     body: JSON.stringify({
       name: payload.name,
-      email: payload.email.toLowerCase(),
+      email: normalizeEmail(payload.email),
       role: payload.role,
       reports_to: payload.reportsTo,
-      area_id: null,
       deleted_at: null,
-      otp_hash: null,
-      otp_expires_at: null,
-      otp_retry_count: 0,
-      otp_verified_at: null,
     }),
   });
 

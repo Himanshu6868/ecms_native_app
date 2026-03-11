@@ -8,6 +8,7 @@ import LoginScreen from '../screens/LoginScreen';
 import CustomerStackNavigator from './CustomerStackNavigator';
 import InternalStackNavigator from './InternalStackNavigator';
 import { resolveAuthorizedProfile } from '../services/auth/authService';
+import { canAccessInternalApp } from '../services/auth/authorization';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/useAuthStore';
 
@@ -42,12 +43,13 @@ const AuthStackNavigator = (): React.JSX.Element => {
         setLoading(true);
         const { data: sessionData } = await supabase.auth.getSession();
 
-        if (sessionData.session?.user?.email) {
-          const profile = await resolveAuthorizedProfile();
-          setAuthState(profile);
-        } else {
+        if (!sessionData.session?.user?.email) {
           logout();
+          return;
         }
+
+        const profile = await resolveAuthorizedProfile();
+        setAuthState(profile);
       } catch {
         await supabase.auth.signOut();
         logout();
@@ -89,16 +91,16 @@ const AuthStackNavigator = (): React.JSX.Element => {
     );
   }
 
-  const initialRoute = isAuthenticated ? (role === 'customer' ? 'CustomerApp' : 'InternalApp') : 'Landing';
+  const isInternalRole = canAccessInternalApp(role);
 
   return (
     <NavigationContainer theme={appTheme}>
-      <Stack.Navigator initialRouteName={initialRoute} screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#030712' } }}>
+      <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#030712' } }}>
         {isAuthenticated ? (
-          role === 'customer' ? (
-            <Stack.Screen name="CustomerApp" component={CustomerStackNavigator} />
-          ) : (
+          isInternalRole ? (
             <Stack.Screen name="InternalApp" component={InternalStackNavigator} />
+          ) : (
+            <Stack.Screen name="CustomerApp" component={CustomerStackNavigator} />
           )
         ) : (
           <>
