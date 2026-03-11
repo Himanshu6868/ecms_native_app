@@ -5,6 +5,7 @@ import AppButton from '../components/AppButton';
 import AppInput from '../components/AppInput';
 import SelectField from '../components/SelectField';
 import { createUser, listReportingManagers } from '../services/auth/authService';
+import { canCreateUsers } from '../services/auth/authorization';
 import { useAuthStore } from '../store/useAuthStore';
 
 type CreateRole = 'internal_support' | 'admin' | 'super_admin';
@@ -48,7 +49,7 @@ const UserManagementScreen = (): React.JSX.Element => {
   );
 
   const handleSubmit = async (): Promise<void> => {
-    if (currentRole !== 'super_admin') {
+    if (!canCreateUsers(currentRole)) {
       Alert.alert('Unauthorized', 'Only super admins can create users.');
       return;
     }
@@ -79,7 +80,7 @@ const UserManagementScreen = (): React.JSX.Element => {
     }
   };
 
-  if (currentRole !== 'super_admin') {
+  if (!canCreateUsers(currentRole)) {
     return (
       <View style={styles.unauthorizedWrap}>
         <Text style={styles.unauthorizedText}>Unauthorized access</Text>

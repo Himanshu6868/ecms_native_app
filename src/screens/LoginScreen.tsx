@@ -5,7 +5,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import AppButton from '../components/AppButton';
 import AppInput from '../components/AppInput';
 import { AuthStackParamList } from '../navigation/AuthStackNavigator';
-import { requireAuthorizedUserByEmail, resolveAuthorizedProfile, sendOtp, verifyOtp } from '../services/auth/authService';
+import { completeOtpLogin, sendOtp, verifyOtp } from '../services/auth/authService';
 import { supabase } from '../lib/supabase';
 import { getEmailError } from '../utils/validators';
 import { useAuthStore } from '../store/useAuthStore';
@@ -21,53 +21,11 @@ const LoginScreen = ({ navigation }: Props): React.JSX.Element => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRequestingOtp, setIsRequestingOtp] = useState(false);
 
-  const emailError = useMemo(() => getEmailError(email.trim().toLowerCase()), [email]);
-
-  const logLoginEvent = (event: string, payload?: Record<string, unknown>): void => {
-    if (payload) {
-      console.log(`[LoginScreen] ${event}`, payload);
-      return;
-    }
-
-    console.log(`[LoginScreen] ${event}`);
-  };
-
-  const maskEmailForLog = (value: string): string => {
-    const [name = '', domain = ''] = value.split('@');
-
-    if (!domain) {
-      return value;
-    }
-
-    if (name.length <= 2) {
-      return `${name[0] ?? '*'}*@${domain}`;
-    }
-
-    return `${name.slice(0, 2)}***@${domain}`;
-  };
-
-  const finalizeLogin = async (): Promise<void> => {
-    logLoginEvent('finalizeLogin:start');
-    const profile = await resolveAuthorizedProfile();
-    logLoginEvent('finalizeLogin:profile-resolved', {
-      hasProfile: Boolean(profile),
-      role: profile?.role,
-    });
-    setAuthState(profile);
-    logLoginEvent('finalizeLogin:auth-state-updated');
-  };
+  const normalizedEmail = useMemo(() => email.trim().toLowerCase(), [email]);
+  const emailError = useMemo(() => getEmailError(normalizedEmail), [normalizedEmail]);
 
   const handleSendOtp = async (): Promise<void> => {
-    const normalizedEmail = email.trim().toLowerCase();
-    const maskedEmail = maskEmailForLog(normalizedEmail);
-
-    logLoginEvent('sendOtp:requested', {
-      email: maskedEmail,
-      hasEmailError: Boolean(emailError),
-    });
-
     if (emailError) {
-      logLoginEvent('sendOtp:blocked-validation', { emailError });
       setStatus(emailError);
       setStatusTone('error');
       return;
@@ -76,37 +34,22 @@ const LoginScreen = ({ navigation }: Props): React.JSX.Element => {
     try {
       setIsRequestingOtp(true);
       setStatus(null);
-
-      await requireAuthorizedUserByEmail(normalizedEmail);
-      logLoginEvent('sendOtp:user-authorized', { email: maskedEmail });
       await sendOtp(normalizedEmail);
-      logLoginEvent('sendOtp:success', { email: maskedEmail });
-
       setStatus('OTP sent successfully. Check your inbox and enter the code below.');
       setStatusTone('success');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to send OTP.';
-      logLoginEvent('sendOtp:failed', { email: maskedEmail, message });
       setStatus(message);
       setStatusTone('error');
     } finally {
-      logLoginEvent('sendOtp:completed', { email: maskedEmail });
       setIsRequestingOtp(false);
     }
   };
 
   const handleVerifyOtp = async (): Promise<void> => {
-    const normalizedEmail = email.trim().toLowerCase();
     const otpValue = enteredOtp.trim();
-    const maskedEmail = maskEmailForLog(normalizedEmail);
-
-    logLoginEvent('verifyOtp:requested', {
-      email: maskedEmail,
-      otpLength: otpValue.length,
-    });
 
     if (!otpValue) {
-      logLoginEvent('verifyOtp:blocked-missing-otp', { email: maskedEmail });
       setStatus('Enter the OTP code to continue.');
       setStatusTone('error');
       return;
@@ -117,18 +60,16 @@ const LoginScreen = ({ navigation }: Props): React.JSX.Element => {
       setStatus(null);
 
       await verifyOtp(normalizedEmail, otpValue);
-      logLoginEvent('verifyOtp:success', { email: maskedEmail });
-      await finalizeLogin();
+      const profile = await completeOtpLogin();
+      setAuthState(profile);
       setStatus('Signed in successfully. Redirecting...');
       setStatusTone('success');
     } catch (error) {
       await supabase.auth.signOut();
       const message = error instanceof Error ? error.message : 'Unable to verify OTP.';
-      logLoginEvent('verifyOtp:failed', { email: maskedEmail, message });
-      setStatus(message);
+      setStatus(message === 'User not authorized' ? 'User not authorized' : message);
       setStatusTone('error');
     } finally {
-      logLoginEvent('verifyOtp:completed', { email: maskedEmail });
       setIsSubmitting(false);
     }
   };
@@ -138,7 +79,6 @@ const LoginScreen = ({ navigation }: Props): React.JSX.Element => {
       <TouchableOpacity
         style={styles.backWrap}
         onPress={() => {
-          logLoginEvent('navigation:back-to-landing');
           navigation.navigate('Landing');
         }}
       >

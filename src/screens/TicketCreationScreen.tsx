@@ -9,6 +9,7 @@ import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { firestore } from '../services/firebase/firebase';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/useAuthStore';
+import { canCreateTickets } from '../services/auth/authorization';
 import Button from '../components/Button';
 import InputField from '../components/InputField';
 import SelectField from '../components/SelectField';
@@ -28,7 +29,7 @@ const priorityOptions = [
 
 const TicketCreationScreen = (): React.JSX.Element => {
   const navigation = useNavigation();
-  const { authUserId } = useAuthStore();
+  const { authUserId, role } = useAuthStore();
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -113,6 +114,11 @@ const TicketCreationScreen = (): React.JSX.Element => {
     Keyboard.dismiss();
 
     if (isSubmitting) {
+      return;
+    }
+
+    if (!canCreateTickets(role)) {
+      Alert.alert('Unauthorized', 'Only customers can create tickets.');
       return;
     }
 
