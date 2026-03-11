@@ -19,16 +19,29 @@ type PublicUserRow = {
 };
 
 const normalizeUserRole = (value: unknown): UserRole | null => {
-  if (value === 'customer' || value === 'internal_support' || value === 'admin' || value === 'super_admin') {
-    return value;
+  if (typeof value !== 'string') {
+    return null;
   }
 
-  if (value === 'user') {
+  const sanitized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[-\s]+/g, '_');
+
+  if (sanitized === 'customer' || sanitized === 'internal_support' || sanitized === 'admin' || sanitized === 'super_admin') {
+    return sanitized;
+  }
+
+  if (sanitized === 'user') {
     return 'customer';
   }
 
-  if (value === 'internal' || value === 'manager' || value === 'agent') {
+  if (sanitized === 'internal' || sanitized === 'manager' || sanitized === 'agent' || sanitized === 'support') {
     return 'internal_support';
+  }
+
+  if (sanitized === 'superadmin') {
+    return 'super_admin';
   }
 
   return null;
