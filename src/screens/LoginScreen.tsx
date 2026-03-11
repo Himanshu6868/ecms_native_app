@@ -5,8 +5,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import AppButton from '../components/AppButton';
 import AppInput from '../components/AppInput';
 import { AuthStackParamList } from '../navigation/AuthStackNavigator';
-import { completeOtpLogin, sendOtp, verifyOtp } from '../services/auth/authService';
-import { supabase } from '../lib/supabase';
+import { sendOtp, verifyOtp } from '../services/auth/authService';
 import { getEmailError } from '../utils/validators';
 import { useAuthStore } from '../store/useAuthStore';
 
@@ -16,6 +15,7 @@ const LoginScreen = ({ navigation }: Props): React.JSX.Element => {
   const { setAuthState } = useAuthStore();
   const [email, setEmail] = useState('');
   const [enteredOtp, setEnteredOtp] = useState('');
+  const [generatedOtp, setGeneratedOtp] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [statusTone, setStatusTone] = useState<'success' | 'error' | 'info'>('info');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -34,11 +34,13 @@ const LoginScreen = ({ navigation }: Props): React.JSX.Element => {
     try {
       setIsRequestingOtp(true);
       setStatus(null);
-      await sendOtp(normalizedEmail);
-      setStatus('OTP sent successfully. Check your inbox and enter the code below.');
+      const otpData = await sendOtp(normalizedEmail);
+      setGeneratedOtp(otpData.otp);
+      setStatus('OTP generated. Enter the OTP shown below to continue.');
       setStatusTone('success');
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to send OTP.';
+      setGeneratedOtp(null);
+      const message = error instanceof Error ? error.message : 'Unable to generate OTP.';
       setStatus(message);
       setStatusTone('error');
     } finally {
@@ -59,13 +61,11 @@ const LoginScreen = ({ navigation }: Props): React.JSX.Element => {
       setIsSubmitting(true);
       setStatus(null);
 
-      await verifyOtp(normalizedEmail, otpValue);
-      const profile = await completeOtpLogin();
+      const profile = await verifyOtp(normalizedEmail, otpValue);
       setAuthState(profile);
       setStatus('Signed in successfully. Redirecting...');
       setStatusTone('success');
     } catch (error) {
-      await supabase.auth.signOut();
       const message = error instanceof Error ? error.message : 'Unable to verify OTP.';
       setStatus(message === 'User not authorized' ? 'User not authorized' : message);
       setStatusTone('error');
@@ -89,42 +89,57 @@ const LoginScreen = ({ navigation }: Props): React.JSX.Element => {
         <Text style={styles.badge}>SECURE LOGIN</Text>
         <Text style={styles.infoTitle}>Role-based OTP access</Text>
         <Text style={styles.bullet}>• Login is allowed only for emails registered in Users table</Text>
-        <Text style={styles.bullet}>• Passwordless one-time passcode verification</Text>
+        <Text style={styles.bullet}>• OTP is generated and displayed inside the app</Text>
         <Text style={styles.bullet}>• Role and permissions loaded after sign-in</Text>
       </View>
 
       <View style={styles.formCard}>
-        <Text style={styles.badge}>LOGIN</Text>
-        <Text style={styles.formTitle}>Email OTP Sign In</Text>
-        <Text style={styles.formSubtitle}>Enter your email to receive a one-time verification code.</Text>
+        <Text style={styles.formTitle}>Sign in with your work email</Text>
+        <Text style={styles.formSubtitle}>Enter the registered email to generate and verify your OTP.</Text>
 
-        <AppInput value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" placeholder="you@example.com" />
+        <AppInput
+          label="Email"
+          value={email}
+          onChangeText={(value) => {
+            setEmail(value);
+            setEnteredOtp('');
+            setGeneratedOtp(null);
+          }}
+          placeholder="you@company.com"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+          textContentType="emailAddress"
+          error={emailError ?? undefined}
+        />
 
-        <AppInput value={enteredOtp} onChangeText={setEnteredOtp} keyboardType="number-pad" placeholder="6-digit OTP" maxLength={6} />
+        <AppButton title={isRequestingOtp ? 'Generating OTP...' : 'Generate OTP'} onPress={() => void handleSendOtp()} disabled={isRequestingOtp} />
 
-        <View style={styles.btnGroup}>
-          <AppButton
-            title={isRequestingOtp ? 'Generating...' : 'Generate OTP'}
-            onPress={() => {
-              if (!isRequestingOtp) {
-                void handleSendOtp();
-              }
-            }}
-          />
-          <AppButton
-            title={isSubmitting ? 'Verifying...' : 'Login'}
-            onPress={() => {
-              if (!isSubmitting) {
-                void handleVerifyOtp();
-              }
-            }}
-          />
-        </View>
+        {generatedOtp ? (
+          <View style={styles.otpCard}>
+            <Text style={styles.otpLabel}>App Generated OTP</Text>
+            <Text style={styles.otpValue}>{generatedOtp}</Text>
+            <Text style={styles.otpNote}>Valid for 5 minutes. Max 5 attempts.</Text>
+          </View>
+        ) : null}
+
+        <AppInput
+          label="Enter OTP"
+          value={enteredOtp}
+          onChangeText={setEnteredOtp}
+          placeholder="6-digit code"
+          keyboardType="number-pad"
+          autoCapitalize="none"
+          autoCorrect={false}
+          textContentType="oneTimeCode"
+        />
+
+        <AppButton title={isSubmitting ? 'Verifying...' : 'Verify OTP'} onPress={() => void handleVerifyOtp()} disabled={isSubmitting} />
 
         {status ? (
-          <View style={[styles.statusWrap, statusTone === 'success' ? styles.statusSuccess : statusTone === 'error' ? styles.statusError : styles.statusInfo]}>
-            <Text style={styles.statusText}>{status}</Text>
-          </View>
+          <Text style={[styles.statusText, statusTone === 'error' ? styles.statusError : statusTone === 'success' ? styles.statusSuccess : styles.statusInfo]}>
+            {status}
+          </Text>
         ) : null}
       </View>
     </ScrollView>
@@ -134,14 +149,15 @@ const LoginScreen = ({ navigation }: Props): React.JSX.Element => {
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
-    backgroundColor: '#030712',
     paddingHorizontal: 20,
-    paddingTop: 36,
+    paddingTop: 52,
     paddingBottom: 24,
+    backgroundColor: '#030712',
     gap: 14,
   },
   backWrap: {
     alignSelf: 'flex-start',
+    paddingVertical: 6,
   },
   backText: {
     color: '#93C5FD',
@@ -153,32 +169,39 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#1F2937',
     borderRadius: 18,
-    padding: 18,
+    padding: 16,
     gap: 8,
   },
   badge: {
-    color: '#60A5FA',
+    alignSelf: 'flex-start',
+    color: '#93C5FD',
     fontSize: 11,
     letterSpacing: 0.8,
     fontWeight: '700',
+    borderWidth: 1,
+    borderColor: '#1E3A8A',
+    backgroundColor: '#0B2948',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
   infoTitle: {
     color: '#F9FAFB',
-    fontSize: 22,
+    fontSize: 21,
     fontWeight: '700',
   },
   bullet: {
     color: '#9CA3AF',
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 13,
+    lineHeight: 19,
   },
   formCard: {
     backgroundColor: '#0B1220',
     borderWidth: 1,
     borderColor: '#1F2937',
     borderRadius: 18,
-    padding: 18,
-    gap: 10,
+    padding: 16,
+    gap: 12,
   },
   formTitle: {
     color: '#F9FAFB',
@@ -187,34 +210,48 @@ const styles = StyleSheet.create({
   },
   formSubtitle: {
     color: '#9CA3AF',
-    fontSize: 14,
-    marginBottom: 8,
+    fontSize: 13,
+    lineHeight: 19,
+    marginBottom: 4,
   },
-  btnGroup: {
-    marginTop: 8,
-    gap: 10,
-  },
-  statusWrap: {
-    borderRadius: 12,
+  otpCard: {
     borderWidth: 1,
-    padding: 10,
-    marginTop: 6,
+    borderColor: '#1E3A8A',
+    backgroundColor: '#0B2948',
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    gap: 4,
+  },
+  otpLabel: {
+    color: '#93C5FD',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+  },
+  otpValue: {
+    color: '#F9FAFB',
+    fontSize: 28,
+    fontWeight: '800',
+    letterSpacing: 4,
+  },
+  otpNote: {
+    color: '#9CA3AF',
+    fontSize: 12,
   },
   statusText: {
     fontSize: 13,
-    fontWeight: '600',
-  },
-  statusSuccess: {
-    borderColor: '#065F46',
-    backgroundColor: '#052E2B',
-  },
-  statusError: {
-    borderColor: '#7F1D1D',
-    backgroundColor: '#450A0A',
+    lineHeight: 18,
+    marginTop: 2,
   },
   statusInfo: {
-    borderColor: '#1E3A8A',
-    backgroundColor: '#0B2948',
+    color: '#BFDBFE',
+  },
+  statusSuccess: {
+    color: '#86EFAC',
+  },
+  statusError: {
+    color: '#FCA5A5',
   },
 });
 

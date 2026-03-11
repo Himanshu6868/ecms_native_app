@@ -21,7 +21,7 @@ const LandingScreen = ({ navigation }: Props): React.JSX.Element => {
       <View style={styles.card}>
         <Text style={styles.cardBadge}>AUTH FLOW</Text>
         <Text style={styles.cardTitle}>Continue to Login</Text>
-        <Text style={styles.description}>Use your authorized email to receive an OTP and access your role-based workspace.</Text>
+        <Text style={styles.description}>Use your authorized email to generate an in-app OTP and access your role-based workspace.</Text>
         <AppButton title="Sign In" onPress={goToLogin} />
       </View>
     </ScrollView>

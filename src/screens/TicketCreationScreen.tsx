@@ -7,7 +7,6 @@ import { useNavigation } from '@react-navigation/native';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 
 import { firestore } from '../services/firebase/firebase';
-import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/useAuthStore';
 import { canCreateTickets } from '../services/auth/authorization';
 import Button from '../components/Button';
@@ -130,10 +129,9 @@ const TicketCreationScreen = (): React.JSX.Element => {
     setIsSubmitting(true);
 
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const sessionUserId = sessionData.session?.user.id;
+      const sessionUserId = authUserId;
 
-      if (!sessionUserId || !authUserId || sessionUserId !== authUserId) {
+      if (!sessionUserId) {
         throw new Error('Unable to identify current user session. Please sign in again.');
       }
 

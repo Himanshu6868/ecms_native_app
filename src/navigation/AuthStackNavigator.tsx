@@ -6,17 +6,19 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import LandingScreen from '../screens/LandingScreen';
 import LoginScreen from '../screens/LoginScreen';
 import CustomerStackNavigator from './CustomerStackNavigator';
-import InternalStackNavigator from './InternalStackNavigator';
-import { resolveAuthorizedProfile } from '../services/auth/authService';
-import { canAccessInternalApp } from '../services/auth/authorization';
-import { supabase } from '../lib/supabase';
+import AdminTabNavigator from './AdminTabNavigator';
+import SuperAdminTabNavigator from './SuperAdminTabNavigator';
+import SupportTabNavigator from './SupportTabNavigator';
+import { logout as performLogout, resolveAuthorizedProfile } from '../services/auth/authService';
 import { useAuthStore } from '../store/useAuthStore';
 
 export type AuthStackParamList = {
   Landing: undefined;
   Login: undefined;
   CustomerApp: undefined;
-  InternalApp: undefined;
+  SupportApp: undefined;
+  AdminApp: undefined;
+  SuperAdminApp: undefined;
 };
 
 const Stack = createNativeStackNavigator<AuthStackParamList>();
@@ -41,17 +43,10 @@ const AuthStackNavigator = (): React.JSX.Element => {
     const initializeAuth = async (): Promise<void> => {
       try {
         setLoading(true);
-        const { data: sessionData } = await supabase.auth.getSession();
-
-        if (!sessionData.session?.user?.email) {
-          logout();
-          return;
-        }
-
         const profile = await resolveAuthorizedProfile();
         setAuthState(profile);
       } catch {
-        await supabase.auth.signOut();
+        await performLogout();
         logout();
       } finally {
         setLoading(false);
@@ -60,27 +55,6 @@ const AuthStackNavigator = (): React.JSX.Element => {
     };
 
     void initializeAuth();
-
-    const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_OUT') {
-        logout();
-        return;
-      }
-
-      if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user.email) {
-        try {
-          const profile = await resolveAuthorizedProfile();
-          setAuthState(profile);
-        } catch {
-          await supabase.auth.signOut();
-          logout();
-        }
-      }
-    });
-
-    return () => {
-      listener.subscription.unsubscribe();
-    };
   }, [logout, setAuthState, setLoading]);
 
   if (bootstrapping || authLoading) {
@@ -91,14 +65,16 @@ const AuthStackNavigator = (): React.JSX.Element => {
     );
   }
 
-  const isInternalRole = canAccessInternalApp(role);
-
   return (
     <NavigationContainer theme={appTheme}>
       <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#030712' } }}>
         {isAuthenticated ? (
-          isInternalRole ? (
-            <Stack.Screen name="InternalApp" component={InternalStackNavigator} />
+          role === 'super_admin' ? (
+            <Stack.Screen name="SuperAdminApp" component={SuperAdminTabNavigator} />
+          ) : role === 'admin' ? (
+            <Stack.Screen name="AdminApp" component={AdminTabNavigator} />
+          ) : role === 'internal_support' ? (
+            <Stack.Screen name="SupportApp" component={SupportTabNavigator} />
           ) : (
             <Stack.Screen name="CustomerApp" component={CustomerStackNavigator} />
           )

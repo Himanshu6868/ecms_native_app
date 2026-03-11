@@ -2,7 +2,7 @@ import React from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Button from '../components/Button';
 import InfoRow from '../components/InfoRow';
-import { logout as supabaseLogout } from '../services/auth/authService';
+import { logout as authLogout } from '../services/auth/authService';
 import { useAuthStore } from '../store/useAuthStore';
 
 const ProfileScreen = (): React.JSX.Element => {
@@ -10,7 +10,7 @@ const ProfileScreen = (): React.JSX.Element => {
 
   const handleLogout = async (): Promise<void> => {
     try {
-      await supabaseLogout();
+      await authLogout();
       logout();
     } catch {
       Alert.alert('Logout failed', 'Unable to logout right now. Please try again.');
