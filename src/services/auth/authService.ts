@@ -15,11 +15,24 @@ type PublicUserRow = {
   email: string;
   full_name: string | null;
   avatar_url: string | null;
-  role: UserRole;
+  role: string | null;
 };
 
-const isUserRole = (value: unknown): value is UserRole =>
-  value === 'customer' || value === 'internal_support' || value === 'admin' || value === 'super_admin';
+const normalizeUserRole = (value: unknown): UserRole | null => {
+  if (value === 'customer' || value === 'internal_support' || value === 'admin' || value === 'super_admin') {
+    return value;
+  }
+
+  if (value === 'user') {
+    return 'customer';
+  }
+
+  if (value === 'internal' || value === 'manager' || value === 'agent') {
+    return 'internal_support';
+  }
+
+  return null;
+};
 
 const normalizeEmail = (email: string): string => email.trim().toLowerCase();
 
@@ -51,12 +64,12 @@ const requestDevelopmentOtp = async (email: string): Promise<string> => {
   return payload.otp;
 };
 
-const mapProfile = (row: PublicUserRow): AuthUserProfile => ({
+const mapProfile = (row: PublicUserRow, role: UserRole): AuthUserProfile => ({
   userId: row.id,
   authUserId: row.id,
   email: normalizeEmail(row.email),
   name: row.full_name?.trim() || row.email,
-  role: row.role,
+  role,
 });
 
 const getProfileByAuthUserId = async (authUserId: string): Promise<AuthUserProfile> => {
@@ -66,11 +79,13 @@ const getProfileByAuthUserId = async (authUserId: string): Promise<AuthUserProfi
     throw new Error(error.message || 'Unable to load profile.');
   }
 
-  if (!data || !isUserRole(data.role)) {
+  const normalizedRole = normalizeUserRole(data?.role);
+
+  if (!data || !normalizedRole) {
     throw new Error('User role is invalid for this application.');
   }
 
-  return mapProfile(data);
+  return mapProfile(data, normalizedRole);
 };
 
 export const sendOtp = async (email: string): Promise<string | null> => {
@@ -163,14 +178,33 @@ type ManageableUser = {
   role: UserRole;
 };
 
+type ManageableUserRow = {
+  id: string;
+  email: string;
+  full_name: string | null;
+  role: string | null;
+};
+
 export const listUsersForManagement = async (): Promise<ManageableUser[]> => {
-  const { data, error } = await supabase.from('users').select('id,email,full_name,role').order('created_at', { ascending: false }).get<ManageableUser>();
+  const { data, error } = await supabase.from('users').select('id,email,full_name,role').order('created_at', { ascending: false }).get<ManageableUserRow>();
 
   if (error) {
     throw new Error(error.message || 'Unable to load users.');
   }
 
-  return (data ?? []).filter((row): row is ManageableUser => Boolean(row?.id && row?.email && isUserRole(row.role)));
+  return (data ?? []).flatMap((row) => {
+    const normalizedRole = normalizeUserRole(row.role);
+    if (!row?.id || !row?.email || !normalizedRole) {
+      return [];
+    }
+
+    return [
+      {
+        ...row,
+        role: normalizedRole,
+      },
+    ];
+  });
 };
 
 export const updateUserRole = async (userId: string, role: UserRole): Promise<void> => {
