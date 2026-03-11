@@ -1,4 +1,7 @@
-import { supabase, supabaseAnonKey, supabaseUrl, type SupabaseSession, type SupabaseUser } from '../../lib/supabase';
+import * as SecureStore from 'expo-secure-store';
+
+import { supabaseAnonKey, supabaseUrl } from '../../lib/supabase';
+import { useAuthStore } from '../../store/useAuthStore';
 
 export type UserRole = 'customer' | 'internal_support' | 'admin' | 'super_admin';
 
@@ -16,6 +19,7 @@ export type AuthUserProfile = {
   email: string;
   name: string;
   role: UserRole;
+  sessionToken: string;
 };
 
 type UserInsertPayload = {
@@ -25,19 +29,63 @@ type UserInsertPayload = {
   reportsTo: string | null;
 };
 
+type GenerateOtpResponse = {
+  otp: string;
+  expiresAt: string;
+};
+
+type VerifyOtpResponse = {
+  token: string;
+  user: {
+    id: string;
+    email: string;
+    name: string;
+    role: UserRole;
+  };
+};
+
+const SESSION_TOKEN_KEY = 'ecms_session_token';
+const MAX_OTP_ATTEMPTS = 5;
+
 const isUserRole = (value: unknown): value is UserRole =>
   value === 'customer' || value === 'internal_support' || value === 'admin' || value === 'super_admin';
 
 const normalizeEmail = (email: string): string => email.trim().toLowerCase();
 
+const invokeEdgeFunction = async <T>(name: string, body: Record<string, unknown>, token?: string): Promise<T> => {
+  const response = await fetch(`${supabaseUrl}/functions/v1/${name}`, {
+    method: 'POST',
+    headers: {
+      apikey: supabaseAnonKey,
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+
+  const raw = (await response.text()) || '{}';
+  const json = JSON.parse(raw) as Record<string, unknown>;
+
+  if (!response.ok) {
+    const message = typeof json.error === 'string' ? json.error : 'Request failed.';
+    throw new Error(message);
+  }
+
+  return json as T;
+};
+
 const requestUsers = async <T>(pathAndQuery: string, init?: RequestInit): Promise<T> => {
-  const { data: sessionData } = await supabase.auth.getSession();
+  const token = await getSessionToken();
+
+  if (!token) {
+    throw new Error('Session expired. Please sign in again.');
+  }
 
   const response = await fetch(`${supabaseUrl}/rest/v1/${pathAndQuery}`, {
     method: init?.method ?? 'GET',
     headers: {
       apikey: supabaseAnonKey,
-      Authorization: `Bearer ${sessionData.session?.access_token ?? supabaseAnonKey}`,
+      Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
       ...(init?.headers ?? {}),
     },
@@ -67,29 +115,31 @@ const mapUserRecord = (row: Record<string, unknown>): UserRecord => {
   };
 };
 
-export const sendOtp = async (email: string): Promise<void> => {
-  const normalizedEmail = normalizeEmail(email);
-  const { error } = await supabase.auth.signInWithOtp({
-    email: normalizedEmail,
-  });
+export const getSessionToken = async (): Promise<string | null> => SecureStore.getItemAsync(SESSION_TOKEN_KEY);
 
-  if (error) {
-    throw new Error(error.message || 'Unable to send OTP.');
-  }
+export const clearSessionToken = async (): Promise<void> => {
+  await SecureStore.deleteItemAsync(SESSION_TOKEN_KEY);
 };
 
-export const verifyOtp = async (email: string, token: string): Promise<SupabaseSession> => {
-  const { data, error } = await supabase.auth.verifyOtp({
-    email: normalizeEmail(email),
-    token,
-    type: 'email',
-  });
+export const sendOtp = async (email: string): Promise<GenerateOtpResponse> => {
+  const normalizedEmail = normalizeEmail(email);
+  return invokeEdgeFunction<GenerateOtpResponse>('generate-otp', { email: normalizedEmail });
+};
 
-  if (error || !data.session) {
-    throw new Error(error?.message ?? 'Unable to verify OTP.');
-  }
+export const verifyOtp = async (email: string, token: string): Promise<AuthUserProfile> => {
+  const normalizedEmail = normalizeEmail(email);
+  const payload = await invokeEdgeFunction<VerifyOtpResponse>('verify-otp', { email: normalizedEmail, otp: token });
 
-  return data.session;
+  await SecureStore.setItemAsync(SESSION_TOKEN_KEY, payload.token);
+
+  return {
+    userId: payload.user.id,
+    authUserId: payload.user.id,
+    email: normalizeEmail(payload.user.email),
+    name: payload.user.name,
+    role: payload.user.role,
+    sessionToken: payload.token,
+  };
 };
 
 export const getUserByEmail = async (email: string): Promise<UserRecord | null> => {
@@ -105,52 +155,28 @@ export const getUserByEmail = async (email: string): Promise<UserRecord | null> 
   return mapUserRecord(rows[0]);
 };
 
-export const buildProfile = (user: SupabaseUser, userRecord: UserRecord): AuthUserProfile => ({
-  userId: userRecord.id,
-  authUserId: user.id,
-  email: normalizeEmail(user.email ?? userRecord.email),
-  name: userRecord.name,
-  role: userRecord.role,
-});
+export const resolveAuthorizedProfile = async (): Promise<AuthUserProfile> => {
+  const token = await getSessionToken();
+  const { email: persistedEmail } = useAuthStore.getState();
 
-const authorizeAuthenticatedUser = async (user: SupabaseUser): Promise<AuthUserProfile> => {
-  const normalizedEmail = normalizeEmail(user.email ?? '');
-
-  if (!normalizedEmail) {
-    throw new Error('User not authorized');
+  if (!token || !persistedEmail) {
+    throw new Error('Session expired. Please sign in again.');
   }
 
-  const userRecord = await getUserByEmail(normalizedEmail);
+  const userRecord = await getUserByEmail(persistedEmail);
 
   if (!userRecord) {
     throw new Error('User not authorized');
   }
 
-  return buildProfile(user, userRecord);
-};
-
-export const resolveAuthorizedProfile = async (): Promise<AuthUserProfile> => {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    throw new Error('User not authorized');
-  }
-
-  return authorizeAuthenticatedUser(user);
-};
-
-export const completeOtpLogin = async (): Promise<AuthUserProfile> => {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    throw new Error('Login failed. Session user not found.');
-  }
-
-  return authorizeAuthenticatedUser(user);
+  return {
+    userId: userRecord.id,
+    authUserId: userRecord.id,
+    email: userRecord.email,
+    name: userRecord.name,
+    role: userRecord.role,
+    sessionToken: token,
+  };
 };
 
 export const listReportingManagers = async (): Promise<Array<{ id: string; name: string; email: string }>> => {
@@ -188,8 +214,7 @@ export const createUser = async (payload: UserInsertPayload): Promise<UserRecord
 };
 
 export const logout = async (): Promise<void> => {
-  const { error } = await supabase.auth.signOut();
-  if (error) {
-    throw new Error(error.message);
-  }
+  await clearSessionToken();
 };
+
+export const getOtpAttemptsRemaining = (retryCount: number): number => Math.max(0, MAX_OTP_ATTEMPTS - retryCount);
