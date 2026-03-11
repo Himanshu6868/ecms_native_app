@@ -9,6 +9,7 @@ import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { firestore } from '../services/firebase/firebase';
 import { useAuthStore } from '../store/useAuthStore';
 import { canCreateTickets } from '../services/auth/authorization';
+import { getAuthenticatedUserId } from '../services/auth/authService';
 import Button from '../components/Button';
 import InputField from '../components/InputField';
 import SelectField from '../components/SelectField';
@@ -28,7 +29,7 @@ const priorityOptions = [
 
 const TicketCreationScreen = (): React.JSX.Element => {
   const navigation = useNavigation();
-  const { authUserId, role } = useAuthStore();
+  const { role } = useAuthStore();
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -129,10 +130,11 @@ const TicketCreationScreen = (): React.JSX.Element => {
     setIsSubmitting(true);
 
     try {
-      const sessionUserId = authUserId;
+      const sessionUserId = await getAuthenticatedUserId();
 
       if (!sessionUserId) {
-        throw new Error('Unable to identify current user session. Please sign in again.');
+        Alert.alert('Session expired', 'Please sign in again before creating a ticket.');
+        return;
       }
 
       const payload = {
@@ -144,7 +146,7 @@ const TicketCreationScreen = (): React.JSX.Element => {
         locationCoordinates: locationCoordinates ?? null,
         createdBy: sessionUserId,
         createdAt: serverTimestamp(),
-        status: 'OPEN',
+        status: 'open',
       };
 
       await addDoc(collection(firestore, TICKETS_COLLECTION), payload);

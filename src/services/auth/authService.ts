@@ -164,6 +164,32 @@ export const resolveAuthorizedProfile = async (): Promise<AuthUserProfile | null
   return getProfileByAuthUserId(user.id);
 };
 
+export const getAuthenticatedUserId = async (): Promise<string | null> => {
+  const {
+    data: { session },
+    error: sessionError,
+  } = await supabase.auth.getSession();
+
+  if (sessionError) {
+    throw new Error(sessionError.message || 'Unable to verify active session.');
+  }
+
+  if (!session) {
+    return null;
+  }
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError) {
+    throw new Error(userError.message || 'Unable to load authenticated user.');
+  }
+
+  return user?.id ?? null;
+};
+
 export const logout = async (): Promise<void> => {
   const { error } = await supabase.auth.signOut();
   if (error) {
