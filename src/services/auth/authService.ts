@@ -82,9 +82,9 @@ const mapProfile = (row: PublicUserRow, role: UserRole): AuthUserProfile => ({
 });
 
 const getProfileByAuthUserId = async (authUser: AuthUserIdentity): Promise<AuthUserProfile> => {
-  const { data, error } = await supabase.from('users').select('id,email,full_name,avatar_url,role').eq('id', authUser.id).maybeSingle<PublicUserRow>();
+  const { data, error } = await supabase.from('users').select('id,email,full_name,avatar_url,role').eq('id', authUser.id).single<PublicUserRow>();
 
-  if (error && error.code !== 'PGRST116') {
+  if (error) {
     throw new Error(error.message || 'Unable to load profile.');
   }
 
