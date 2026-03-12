@@ -5,9 +5,11 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import DashboardScreen from '../screens/DashboardScreen';
 import MyTicketsScreen from '../screens/MyTicketsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import TicketCreationScreen from '../screens/TicketCreationScreen';
 
 type AdminTabParamList = {
   Dashboard: undefined;
+  'Create Ticket': undefined;
   'Ticket Management': undefined;
   Profile: undefined;
 };
@@ -38,6 +40,7 @@ const AdminTabNavigator = (): React.JSX.Element => (
       tabBarIcon: ({ color, size }) => {
         const iconMap: Record<keyof AdminTabParamList, keyof typeof Ionicons.glyphMap> = {
           Dashboard: 'grid-outline',
+          'Create Ticket': 'add-circle-outline',
           'Ticket Management': 'list-outline',
           Profile: 'person-outline',
         };
@@ -47,6 +50,7 @@ const AdminTabNavigator = (): React.JSX.Element => (
     })}
   >
     <Tab.Screen name="Dashboard" component={DashboardScreen} />
+    <Tab.Screen name="Create Ticket" component={TicketCreationScreen} />
     <Tab.Screen name="Ticket Management" component={MyTicketsScreen} />
     <Tab.Screen name="Profile" component={ProfileScreen} />
   </Tab.Navigator>

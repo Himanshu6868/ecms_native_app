@@ -118,7 +118,7 @@ const TicketCreationScreen = (): React.JSX.Element => {
     }
 
     if (!canCreateTickets(role)) {
-      Alert.alert('Unauthorized', 'Only customers can create tickets.');
+      Alert.alert('Unauthorized', 'Your current role does not have ticket creation access.');
       return;
     }
 
@@ -146,7 +146,7 @@ const TicketCreationScreen = (): React.JSX.Element => {
         locationCoordinates: locationCoordinates ?? null,
         createdBy: sessionUserId,
         createdAt: serverTimestamp(),
-        status: 'open',
+        status: 'OPEN',
       };
 
       await addDoc(collection(firestore, TICKETS_COLLECTION), payload);

@@ -5,12 +5,12 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import DashboardScreen from '../screens/DashboardScreen';
 import MyTicketsScreen from '../screens/MyTicketsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
-import UserManagementScreen from '../screens/UserManagementScreen';
+import TicketCreationScreen from '../screens/TicketCreationScreen';
 
 type SuperAdminTabParamList = {
   Dashboard: undefined;
+  'Create Ticket': undefined;
   'Ticket Management': undefined;
-  'User Management': undefined;
   Profile: undefined;
 };
 
@@ -40,8 +40,8 @@ const SuperAdminTabNavigator = (): React.JSX.Element => (
       tabBarIcon: ({ color, size }) => {
         const iconMap: Record<keyof SuperAdminTabParamList, keyof typeof Ionicons.glyphMap> = {
           Dashboard: 'grid-outline',
+          'Create Ticket': 'add-circle-outline',
           'Ticket Management': 'list-outline',
-          'User Management': 'people-outline',
           Profile: 'person-outline',
         };
 
@@ -50,8 +50,8 @@ const SuperAdminTabNavigator = (): React.JSX.Element => (
     })}
   >
     <Tab.Screen name="Dashboard" component={DashboardScreen} />
+    <Tab.Screen name="Create Ticket" component={TicketCreationScreen} />
     <Tab.Screen name="Ticket Management" component={MyTicketsScreen} />
-    <Tab.Screen name="User Management" component={UserManagementScreen} />
     <Tab.Screen name="Profile" component={ProfileScreen} />
   </Tab.Navigator>
 );

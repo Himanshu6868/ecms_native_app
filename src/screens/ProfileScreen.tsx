@@ -1,12 +1,16 @@
-import React from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import Button from '../components/Button';
 import InfoRow from '../components/InfoRow';
 import { logout as authLogout } from '../services/auth/authService';
 import { useAuthStore } from '../store/useAuthStore';
+import { canCreateUsers } from '../services/auth/authorization';
+import UserManagementScreen from './UserManagementScreen';
 
 const ProfileScreen = (): React.JSX.Element => {
   const { userId, authUserId, name, email, role, logout } = useAuthStore();
+  const [isUserManagementVisible, setIsUserManagementVisible] = useState(false);
 
   const handleLogout = async (): Promise<void> => {
     try {
@@ -25,44 +29,66 @@ const ProfileScreen = (): React.JSX.Element => {
     .toUpperCase();
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Profile</Text>
-        <Text style={styles.subtitle}>Account information</Text>
-      </View>
-
-      <View style={styles.card}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{initials}</Text>
+    <>
+      <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Profile</Text>
+          <Text style={styles.subtitle}>Account information</Text>
         </View>
 
-        <Text style={styles.name}>{name ?? 'User'}</Text>
-        <Text style={styles.email}>{email ?? '-'}</Text>
-
-        <View style={styles.roleBadge}>
-          <Text style={styles.roleText}>{(role ?? 'customer').toUpperCase()}</Text>
-        </View>
-
-        <View style={styles.infoSection}>
-          <InfoRow label="Department" value="Support" />
-          <InfoRow label="User ID" value={userId ?? '-'} />
-          <InfoRow label="Auth ID" value={authUserId ?? '-'} />
-        </View>
-      </View>
-
-      {role !== 'customer' ? (
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Account Actions</Text>
-          <View style={styles.actionsWrap}>
-            <Text style={styles.helperText}>Operational access is managed by your role policy.</Text>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{initials}</Text>
+          </View>
+
+          <Text style={styles.name}>{name ?? 'User'}</Text>
+          <Text style={styles.email}>{email ?? '-'}</Text>
+
+          <View style={styles.roleBadge}>
+            <Text style={styles.roleText}>{(role ?? 'customer').toUpperCase()}</Text>
+          </View>
+
+          <View style={styles.infoSection}>
+            <InfoRow label="Department" value="Support" />
+            <InfoRow label="User ID" value={userId ?? '-'} />
+            <InfoRow label="Auth ID" value={authUserId ?? '-'} />
           </View>
         </View>
-      ) : null}
 
-      <View style={styles.logoutSection}>
-        <Button title="Logout" variant="danger" onPress={() => void handleLogout()} style={styles.logoutButton} />
-      </View>
-    </ScrollView>
+        {role !== 'customer' ? (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>Account Actions</Text>
+            <View style={styles.actionsWrap}>
+              <Text style={styles.helperText}>Operational access is managed by your role policy.</Text>
+              {canCreateUsers(role) ? (
+                <Button
+                  title="User Management"
+                  variant="secondary"
+                  onPress={() => setIsUserManagementVisible(true)}
+                  style={styles.managementButton}
+                />
+              ) : null}
+            </View>
+          </View>
+        ) : null}
+
+        <View style={styles.logoutSection}>
+          <Button title="Logout" variant="danger" onPress={() => void handleLogout()} style={styles.logoutButton} />
+        </View>
+      </ScrollView>
+
+      <Modal visible={isUserManagementVisible} animationType="slide" onRequestClose={() => setIsUserManagementVisible(false)}>
+        <View style={styles.modalWrap}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalHeaderText}>User Management</Text>
+            <Pressable onPress={() => setIsUserManagementVisible(false)}>
+              <Ionicons name="close" size={22} color="#F9FAFB" />
+            </Pressable>
+          </View>
+          <UserManagementScreen />
+        </View>
+      </Modal>
+    </>
   );
 };
 
@@ -152,12 +178,32 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     fontSize: 14,
   },
+  managementButton: {
+    width: '100%',
+  },
   logoutSection: {
     marginTop: 4,
   },
   logoutButton: {
     width: '100%',
     borderRadius: 14,
+  },
+  modalWrap: {
+    flex: 1,
+    backgroundColor: '#030712',
+    paddingTop: 44,
+  },
+  modalHeader: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  modalHeaderText: {
+    color: '#F9FAFB',
+    fontSize: 20,
+    fontWeight: '700',
   },
 });
 
