@@ -1,5 +1,5 @@
-import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import Badge from './Badge';
@@ -13,6 +13,9 @@ export type Ticket = {
   status: TicketStatus;
   priority: TicketPriority;
   assignedTo: string;
+  title?: string;
+  description?: string;
+  category?: string;
 };
 
 type TicketCardProps = {
@@ -34,12 +37,16 @@ const priorityVariantMap: Record<TicketPriority, 'neutral' | 'info' | 'warning' 
 };
 
 const TicketCard = ({ ticket, canUpdateStatus = false }: TicketCardProps): React.JSX.Element => {
+  const [isDetailsVisible, setIsDetailsVisible] = useState(false);
+
   return (
     <View style={styles.card}>
       <View style={styles.rowBetween}>
         <Text style={styles.ticketId}>{ticket.id.toUpperCase()}</Text>
         <Badge label={ticket.status} variant={statusVariantMap[ticket.status]} />
       </View>
+
+      <Text style={styles.title}>{ticket.title ?? 'Untitled ticket'}</Text>
 
       <View style={styles.rowStart}>
         <Badge label={ticket.priority} variant={priorityVariantMap[ticket.priority]} />
@@ -51,7 +58,7 @@ const TicketCard = ({ ticket, canUpdateStatus = false }: TicketCardProps): React
       </View>
 
       <View style={styles.buttonRow}>
-        <Button title="Details" variant="secondary" style={styles.flexButton} onPress={() => undefined} />
+        <Button title="Details" variant="secondary" style={styles.flexButton} onPress={() => setIsDetailsVisible(true)} />
         <Button title="Chat" variant="secondary" style={styles.flexButton} onPress={() => undefined} />
       </View>
 
@@ -64,6 +71,26 @@ const TicketCard = ({ ticket, canUpdateStatus = false }: TicketCardProps): React
           <Button title="Update" style={styles.updateButton} onPress={() => undefined} />
         </View>
       ) : null}
+
+      <Modal visible={isDetailsVisible} transparent animationType="fade" onRequestClose={() => setIsDetailsVisible(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.rowBetween}>
+              <Text style={styles.modalTitle}>{ticket.id.toUpperCase()}</Text>
+              <Pressable onPress={() => setIsDetailsVisible(false)}>
+                <Ionicons name="close" size={20} color="#D1D5DB" />
+              </Pressable>
+            </View>
+            <Text style={styles.modalText}>Title: {ticket.title ?? 'Untitled ticket'}</Text>
+            <Text style={styles.modalText}>Category: {ticket.category ?? 'General'}</Text>
+            <Text style={styles.modalText}>Priority: {ticket.priority}</Text>
+            <Text style={styles.modalText}>Status: {ticket.status}</Text>
+            <Text style={styles.modalText}>Assigned to: {ticket.assignedTo}</Text>
+            <Text style={styles.modalText}>Description:</Text>
+            <Text style={styles.modalDescription}>{ticket.description ?? 'No description provided.'}</Text>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -91,6 +118,11 @@ const styles = StyleSheet.create({
     color: '#F3F4F6',
     fontSize: 15,
     fontWeight: '700',
+  },
+  title: {
+    color: '#E5E7EB',
+    fontSize: 14,
+    fontWeight: '500',
   },
   assignedWrap: {
     gap: 2,
@@ -134,6 +166,34 @@ const styles = StyleSheet.create({
   },
   updateButton: {
     minWidth: 96,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(3, 7, 18, 0.75)',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  modalCard: {
+    backgroundColor: '#0B1220',
+    borderColor: '#1F2937',
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 16,
+    gap: 8,
+  },
+  modalTitle: {
+    color: '#F9FAFB',
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  modalText: {
+    color: '#D1D5DB',
+    fontSize: 13,
+  },
+  modalDescription: {
+    color: '#E5E7EB',
+    fontSize: 13,
+    lineHeight: 18,
   },
 });
 

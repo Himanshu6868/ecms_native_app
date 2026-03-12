@@ -19,6 +19,9 @@ const normalizeTicket = (id: string, data: Record<string, unknown>): Ticket => (
       ? data.priority
       : 'LOW',
   assignedTo: typeof data.assignedTo === 'string' && data.assignedTo.trim() ? data.assignedTo : 'Unassigned',
+  title: typeof data.title === 'string' ? data.title : 'Untitled ticket',
+  description: typeof data.description === 'string' ? data.description : 'No description provided.',
+  category: typeof data.category === 'string' ? data.category : 'General',
 });
 
 const MyTicketsScreen = (): React.JSX.Element => {
@@ -63,7 +66,12 @@ const MyTicketsScreen = (): React.JSX.Element => {
     }
 
     return tickets.filter(
-      (ticket) => ticket.id.toLowerCase().includes(queryText) || ticket.status.toLowerCase().includes(queryText),
+      (ticket) =>
+        ticket.id.toLowerCase().includes(queryText) ||
+        ticket.status.toLowerCase().includes(queryText) ||
+        (ticket.title ?? '').toLowerCase().includes(queryText) ||
+        (ticket.description ?? '').toLowerCase().includes(queryText) ||
+        (ticket.category ?? '').toLowerCase().includes(queryText),
     );
   }, [searchQuery, tickets]);
 
@@ -86,7 +94,7 @@ const MyTicketsScreen = (): React.JSX.Element => {
             style={styles.searchInput}
             value={searchQuery}
             onChangeText={setSearchQuery}
-            placeholder="Search by ticket ID or status"
+            placeholder="Search by ID, status, title, category"
             placeholderTextColor="#6B7280"
           />
         </View>

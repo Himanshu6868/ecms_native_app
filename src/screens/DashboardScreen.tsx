@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { collection, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
 
@@ -12,12 +12,18 @@ import { canUpdateTicketStatus } from '../services/auth/authorization';
 
 type TicketStatus = 'OPEN' | 'CLOSED' | 'ASSIGNED';
 type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+type TicketFilter = 'ALL' | 'OPEN' | 'HIGH_PRIORITY' | 'ASSIGNED_TO_ME';
 
 type Ticket = {
   id: string;
   status: TicketStatus;
   priority: TicketPriority;
   assignedTo: string;
+  title: string;
+  description: string;
+  category: string;
+  createdBy: string;
+  assignedToId: string;
 };
 
 const TICKETS_COLLECTION = 'tickets';
@@ -39,10 +45,12 @@ const normalizePriority = (priority: unknown): TicketPriority => {
 };
 
 const DashboardScreen = (): React.JSX.Element => {
-  const { role } = useAuthStore();
+  const { role, authUserId } = useAuthStore();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedFilter, setSelectedFilter] = useState<TicketFilter>('ALL');
+  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
 
   useEffect(() => {
     const ticketsQuery = query(collection(firestore, TICKETS_COLLECTION), orderBy('createdAt', 'desc'), limit(20));
@@ -58,6 +66,11 @@ const DashboardScreen = (): React.JSX.Element => {
             status: normalizeStatus(data.status),
             priority: normalizePriority(data.priority),
             assignedTo: typeof data.assignedTo === 'string' && data.assignedTo.trim() ? data.assignedTo : 'Unassigned',
+            title: typeof data.title === 'string' && data.title.trim() ? data.title : 'Untitled ticket',
+            description: typeof data.description === 'string' ? data.description : 'No description provided.',
+            category: typeof data.category === 'string' && data.category.trim() ? data.category : 'General',
+            createdBy: typeof data.createdBy === 'string' ? data.createdBy : '',
+            assignedToId: typeof data.assignedToId === 'string' ? data.assignedToId : '',
           };
         });
 
@@ -74,20 +87,43 @@ const DashboardScreen = (): React.JSX.Element => {
   }, []);
 
   const filteredTickets = useMemo(() => {
+    const scopedTickets = tickets.filter((ticket) => {
+      if (selectedFilter === 'OPEN') {
+        return ticket.status === 'OPEN' || ticket.status === 'ASSIGNED';
+      }
+
+      if (selectedFilter === 'HIGH_PRIORITY') {
+        return ticket.priority === 'HIGH' || ticket.priority === 'CRITICAL';
+      }
+
+      if (selectedFilter === 'ASSIGNED_TO_ME') {
+        if (!authUserId) {
+          return false;
+        }
+
+        return ticket.createdBy === authUserId || ticket.assignedToId === authUserId;
+      }
+
+      return true;
+    });
+
     const queryText = searchQuery.trim().toLowerCase();
 
     if (!queryText) {
-      return tickets;
+      return scopedTickets;
     }
 
-    return tickets.filter(
+    return scopedTickets.filter(
       (ticket) =>
         ticket.id.toLowerCase().includes(queryText) ||
+        ticket.title.toLowerCase().includes(queryText) ||
+        ticket.description.toLowerCase().includes(queryText) ||
+        ticket.category.toLowerCase().includes(queryText) ||
         ticket.status.toLowerCase().includes(queryText) ||
         ticket.priority.toLowerCase().includes(queryText) ||
         ticket.assignedTo.toLowerCase().includes(queryText),
     );
-  }, [searchQuery, tickets]);
+  }, [authUserId, searchQuery, selectedFilter, tickets]);
 
   const renderStatusBadge = (status: Ticket['status']) => (
     <Badge label={status} variant={status === 'ASSIGNED' ? 'info' : status === 'OPEN' ? 'assigned' : 'success'} />
@@ -143,27 +179,35 @@ const DashboardScreen = (): React.JSX.Element => {
             style={styles.searchInput}
             value={searchQuery}
             onChangeText={setSearchQuery}
-            placeholder="Search tickets by ID, status, priority..."
+            placeholder="Search by ID, title, category, status, priority..."
             placeholderTextColor="#6B7280"
           />
         </View>
 
         <View style={styles.filterRow}>
           <View style={styles.chipsWrap}>
-            <Badge label="All" variant="active" />
-            <Badge label="Open" variant="neutral" />
-            <Badge label="High Priority" variant="neutral" />
-            <Badge label="Assigned to Me" variant="neutral" />
+            <Pressable onPress={() => setSelectedFilter('ALL')}>
+              <Badge label="All" variant={selectedFilter === 'ALL' ? 'active' : 'neutral'} />
+            </Pressable>
+            <Pressable onPress={() => setSelectedFilter('OPEN')}>
+              <Badge label="Open" variant={selectedFilter === 'OPEN' ? 'active' : 'neutral'} />
+            </Pressable>
+            <Pressable onPress={() => setSelectedFilter('HIGH_PRIORITY')}>
+              <Badge label="High Priority" variant={selectedFilter === 'HIGH_PRIORITY' ? 'active' : 'neutral'} />
+            </Pressable>
+            <Pressable onPress={() => setSelectedFilter('ASSIGNED_TO_ME')}>
+              <Badge label="Assigned to Me" variant={selectedFilter === 'ASSIGNED_TO_ME' ? 'active' : 'neutral'} />
+            </Pressable>
           </View>
-          <ActionButton title="Apply" variant="primary" style={styles.applyButton} />
+          <ActionButton title="Reset" variant="primary" style={styles.applyButton} onPress={() => setSelectedFilter('ALL')} />
         </View>
       </View>
 
       <View style={styles.ticketListHeader}>
         <Text style={styles.sectionTitle}>Ticket Queue</Text>
         <View style={styles.ticketTabs}>
-          <Badge label="All Tickets" variant="active" />
-          <Badge label="Assigned to Me" variant="neutral" />
+          <Badge label="All Tickets" variant={selectedFilter === 'ALL' ? 'active' : 'neutral'} />
+          <Badge label="Assigned to Me" variant={selectedFilter === 'ASSIGNED_TO_ME' ? 'active' : 'neutral'} />
         </View>
       </View>
 
@@ -186,13 +230,15 @@ const DashboardScreen = (): React.JSX.Element => {
                 {renderStatusBadge(ticket.status)}
               </View>
 
+              <Text style={styles.ticketTitle}>{ticket.title}</Text>
+
               <View style={styles.ticketRowSpaceBetween}>
                 {renderPriorityBadge(ticket.priority)}
                 <Text style={styles.assignedTo}>{ticket.assignedTo}</Text>
               </View>
 
               <View style={styles.actionsRow}>
-                <ActionButton title="Details" style={styles.flexButton} />
+                <ActionButton title="Details" style={styles.flexButton} onPress={() => setSelectedTicket(ticket)} />
                 <ActionButton title="Chat" style={styles.flexButton} />
               </View>
 
@@ -209,6 +255,26 @@ const DashboardScreen = (): React.JSX.Element => {
           ))
         )}
       </View>
+
+      <Modal visible={selectedTicket !== null} transparent animationType="fade" onRequestClose={() => setSelectedTicket(null)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.ticketRowSpaceBetween}>
+              <Text style={styles.modalTitle}>{selectedTicket?.id}</Text>
+              <Pressable onPress={() => setSelectedTicket(null)}>
+                <Ionicons name="close" size={20} color="#D1D5DB" />
+              </Pressable>
+            </View>
+            <Text style={styles.modalText}>Title: {selectedTicket?.title}</Text>
+            <Text style={styles.modalText}>Category: {selectedTicket?.category}</Text>
+            <Text style={styles.modalText}>Priority: {selectedTicket?.priority}</Text>
+            <Text style={styles.modalText}>Status: {selectedTicket?.status}</Text>
+            <Text style={styles.modalText}>Assigned To: {selectedTicket?.assignedTo}</Text>
+            <Text style={styles.modalText}>Description:</Text>
+            <Text style={styles.modalDescription}>{selectedTicket?.description}</Text>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
@@ -355,6 +421,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
+  ticketTitle: {
+    color: '#E5E7EB',
+    fontSize: 14,
+    fontWeight: '500',
+  },
   assignedTo: {
     color: '#9CA3AF',
     fontSize: 12,
@@ -391,6 +462,34 @@ const styles = StyleSheet.create({
   },
   updateButton: {
     minWidth: 90,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(3, 7, 18, 0.75)',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  modalCard: {
+    backgroundColor: '#0B1220',
+    borderColor: '#1F2937',
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 16,
+    gap: 8,
+  },
+  modalTitle: {
+    color: '#F9FAFB',
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  modalText: {
+    color: '#D1D5DB',
+    fontSize: 13,
+  },
+  modalDescription: {
+    color: '#E5E7EB',
+    fontSize: 13,
+    lineHeight: 18,
   },
 });
 

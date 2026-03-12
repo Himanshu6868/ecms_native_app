@@ -9,4 +9,5 @@ export const canViewAllTickets = (role: UserRole | null): boolean => canAccessIn
 
 export const canUpdateTicketStatus = (role: UserRole | null): boolean => role === 'admin' || role === 'super_admin';
 
-export const canCreateTickets = (role: UserRole | null): boolean => role === 'customer';
+export const canCreateTickets = (role: UserRole | null): boolean =>
+  role === 'customer' || role === 'admin' || role === 'super_admin';
